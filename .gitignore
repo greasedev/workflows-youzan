@@ -137,3 +137,5 @@ vite.config.ts.timestamp-*
 
 # Project specific
 .DS_Store
+
+workflows.zip

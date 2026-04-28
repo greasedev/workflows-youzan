@@ -19,7 +19,7 @@
  */
 
 import { Agent, type WorkflowContext } from '@greaseclaw/workflow-sdk';
-import { createWorkflowApis } from './api';
+import { createWorkflowApis } from '../api';
 
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {

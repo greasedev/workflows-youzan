@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin/workflow-build.mjs src/workflows dist",
-    "build:pages": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin//page-build.mjs src/pages dist/pages",
+    "build:pages": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin/page-build.mjs src/pages dist/pages",
     "dev": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin/workflow-dev.mjs",
-    "dev:pages": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin//page-dev.mjs src/pages 3000",
+    "dev:pages": "npx tsx node_modules/@greaseclaw/workflow-sdk/bin/page-dev.mjs src/pages 3000",
     "zip": "npm run build && npm run build:pages && rm -f workflows.zip && zip -r workflows.zip src/ dist package.json tsconfig.json"
   },
   "dependencies": {
