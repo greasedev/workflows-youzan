@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品上新提醒 - AI Agent</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>商品上新提醒</h1>
+            <p>AI Agent 商品全流程跟踪系统 - 待上新商品列表</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="label">待上新商品</div>
+                <div class="value" id="pending-count">0</div>
+            </div>
+            <div class="stat-card warning">
+                <div class="label">即将超期（4周内）</div>
+                <div class="value" id="expiring-count">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">本周已上新</div>
+                <div class="value" id="completed-count">0</div>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <div class="table-header">
+                <h2>上新提醒列表</h2>
+                <span class="count" id="list-count">共 0 条</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 200px;">商品信息</th>
+                        <th style="width: 100px;">成本价格</th>
+                        <th style="width: 180px;">建档时间</th>
+                        <th style="width: 100px;">距离建档</th>
+                        <th style="width: 180px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="product-list">
+                    <!-- 数据将通过 JavaScript 动态填充 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal" id="confirm-modal">
+        <div class="modal-content">
+            <div class="modal-title" id="modal-title">确认操作</div>
+            <div class="modal-body" id="modal-body">确定要执行此操作吗？</div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="modal-cancel-btn">取消</button>
+                <button class="btn btn-primary" id="modal-confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div class="toast" id="toast"></div>
+
+    <!-- 引用编译后的 JavaScript -->
+    <script src="./index.ts"></script>
+</body>
+</html>
