@@ -30,7 +30,8 @@ export interface ExecutionResult {
  * WorkflowApis interface - methods generated from your API dependencies
  */
 export interface WorkflowApis {
-  export_goods: (start_time?: string) => Promise<ExecutionResult>;
+  export_goods: (start_time: string, end_time: string) => Promise<ExecutionResult>;
+  get_report_list: () => Promise<ExecutionResult>;
 }
 
 
@@ -44,10 +45,22 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
    * 打开商品库页面，在创建时间输入框中填入开始日期和结束日期，商品来源选择全部，然后点击导出按钮
    * @endpoint /v1/custom/https-store-youzan-com-export-goods-gf9oj9
    */
-  async export_goods(start_time?: string): Promise<ExecutionResult> {
+  async export_goods(start_time: string, end_time: string): Promise<ExecutionResult> {
     const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-export-goods-gf9oj9', {
       method: 'POST',
-      body: { start_time },
+      body: { start_time, end_time },
+    });
+    return data;
+  },
+
+  /**
+   * Get report list
+   * 获取导出文件列表，获取导出文件列表，获取导出文件列表
+   * @endpoint /v1/custom/https-store-youzan-com-get-report-list-38unjm
+   */
+  async get_report_list(): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-get-report-list-38unjm', {
+      method: 'POST',
     });
     return data;
   },

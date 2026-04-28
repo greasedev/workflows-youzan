@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 
 workflows.zip
 .vscode/
+test.js
