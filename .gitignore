@@ -139,3 +139,4 @@ vite.config.ts.timestamp-*
 .DS_Store
 
 workflows.zip
+.vscode/
