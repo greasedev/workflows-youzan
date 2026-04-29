@@ -12,7 +12,6 @@ const products: Product[] = [
     name: "春季新款连衣裙",
     barcode: "SP20260421001",
     code: "SP20260421001",
-    image: "https://via.placeholder.com/60x60?text=商品1",
     costPrice: 158.0,
     createTime: 1745374200, // 2026-03-24 10:30:00
     status: "pending",
@@ -22,7 +21,6 @@ const products: Product[] = [
     name: "夏季薄款T恤",
     barcode: "SP20260418002",
     code: "SP20260418002",
-    image: "https://via.placeholder.com/60x60?text=商品2",
     costPrice: 68.0,
     createTime: 1745821200, // 2026-03-28 14:20:00
     status: "pending",
@@ -32,7 +30,6 @@ const products: Product[] = [
     name: "经典牛仔裤",
     barcode: "SP20260415003",
     code: "SP20260415003",
-    image: "https://via.placeholder.com/60x60?text=商品3",
     costPrice: 199.0,
     createTime: 1746470100, // 2026-04-01 09:15:00
     status: "pending",
@@ -42,7 +39,6 @@ const products: Product[] = [
     name: "休闲运动鞋",
     barcode: "SP20260412004",
     code: "SP20260412004",
-    image: "https://via.placeholder.com/60x60?text=商品4",
     costPrice: 299.0,
     createTime: 1746866700, // 2026-04-05 16:45:00
     status: "pending",
@@ -52,7 +48,6 @@ const products: Product[] = [
     name: "时尚帆布包",
     barcode: "SP20260410005",
     code: "SP20260410005",
-    image: "https://via.placeholder.com/60x60?text=商品5",
     costPrice: 89.0,
     createTime: 1747086000, // 2026-04-08 11:00:00
     status: "pending",
@@ -62,7 +57,6 @@ const products: Product[] = [
     name: "纯棉短袖衬衫",
     barcode: "SP20260408006",
     code: "SP20260408006",
-    image: "https://via.placeholder.com/60x60?text=商品6",
     costPrice: 128.0,
     createTime: 1747233000, // 2026-04-10 08:30:00
     status: "pending",
@@ -141,11 +135,14 @@ function renderProducts(): void {
     tbody.innerHTML = pendingProducts
       .map((product: Product) => {
         const duration = getDuration(product.createTime);
+        const imageHtml = product.image
+          ? `<img class="product-img" src="${product.image}" alt="${product.name}" onclick="ProductApp.showImageModal('${product.image}', '${product.name}')">`
+          : '';
         return `
                 <tr data-id="${product.pid}">
                     <td>
                         <div class="product-info">
-                            <img class="product-img" src="${product.image}" alt="${product.name}" onclick="ProductApp.showImageModal('${product.image}', '${product.name}')">
+                            ${imageHtml}
                             <div>
                                 <div class="product-name">${product.name}</div>
                                 <div class="product-barcode">条码: ${product.barcode}</div>
