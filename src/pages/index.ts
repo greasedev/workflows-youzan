@@ -4,7 +4,8 @@
  */
 
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
-import { Product, OperationLog, DurationResult } from "../models/types";
+import { Product, DurationResult } from "../models/types";
+import { formatDate, formatOptionalDate } from "../libs/date";
 
 // 扩展 Window 类型以包含 agentOptions
 declare global {
@@ -19,9 +20,6 @@ const db = agent.getDb();
 db.version(1).stores({
   product: "++id, &pid, &barcode, &code, createTime, status, remindTime, listedTime",
 });
-
-// 操作记录（模拟）
-const operationLogs: OperationLog[] = [];
 
 type ProductListType = "new" | "transfer" | "return";
 
@@ -46,31 +44,10 @@ function getDuration(createTime: number): DurationResult {
 }
 
 /**
- * 格式化时间戳为日期时间字符串
- */
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-/**
  * 格式化价格
  */
 function formatPrice(price: number): string {
   return "¥" + price.toFixed(2);
-}
-
-/**
- * 格式化可选时间
- */
-function formatOptionalDate(timestamp?: number): string {
-  return timestamp ? formatDate(timestamp) : "-";
 }
 
 /**
@@ -355,17 +332,8 @@ async function handleRemindLater(productId: number): Promise<void> {
     "确认延迟提醒",
     `确定将「${product.name}」设置为3天后再次提醒吗？`,
     async () => {
-      // 记录操作
       const nowTimestamp = Math.floor(Date.now() / 1000);
       const remindTimestamp = nowTimestamp + 3 * 24 * 60 * 60;
-
-      operationLogs.push({
-        productId: productId,
-        productName: product.name,
-        operationType: "3天后提醒",
-        operationTime: new Date(nowTimestamp * 1000).toISOString(),
-        remindTime: new Date(remindTimestamp * 1000).toISOString(),
-      });
 
       // 更新数据库
       await db.table("product").update(product.id, {
@@ -404,15 +372,6 @@ async function handleMarkNew(productId: number): Promise<void> {
         listedTime: nowTimestamp,
       });
 
-      // 记录操作
-      operationLogs.push({
-        productId: productId,
-        productName: product.name,
-        operationType: "已上新",
-        operationTime: new Date(nowTimestamp * 1000).toISOString(),
-        listedTime: new Date(nowTimestamp * 1000).toISOString(),
-      });
-
       // 重新渲染
       await renderProducts();
 
@@ -440,13 +399,6 @@ async function handleMarkReturned(productId: number): Promise<void> {
       await db.table("product").update(product.id, {
         status: "returned",
         returnedTime: nowTimestamp,
-      });
-
-      operationLogs.push({
-        productId: productId,
-        productName: product.name,
-        operationType: "已回库",
-        operationTime: new Date(nowTimestamp * 1000).toISOString(),
       });
 
       await renderProducts();
@@ -563,13 +515,6 @@ function updateActiveTab(listType: ProductListType): void {
 }
 
 /**
- * 获取操作日志（供外部调用）
- */
-function getOperationLogs(): OperationLog[] {
-  return operationLogs;
-}
-
-/**
  * 获取商品列表（供外部调用）
  */
 async function getProducts(): Promise<Product[]> {
@@ -582,7 +527,6 @@ const ProductApp = {
   handleMarkNew,
   handleMarkReturned,
   showImageModal,
-  getOperationLogs,
   getProducts,
 };
 

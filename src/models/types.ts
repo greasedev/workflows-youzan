@@ -17,16 +17,6 @@ export interface Product {
   returnedTime?: number; // 回库时间，秒时间戳
 }
 
-// 操作日志接口
-export interface OperationLog {
-  productId: number;
-  productName: string;
-  operationType: string;
-  operationTime: string;
-  remindTime?: string;
-  listedTime?: string;
-}
-
 // 时间计算结果接口
 export interface DurationResult {
   days: number;
