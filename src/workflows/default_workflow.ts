@@ -29,7 +29,8 @@ export async function execute(context: WorkflowContext) {
   const apis = createWorkflowApis(agent);
   const db = agent.getDb();
   db.version(1).stores({
-    reportList: "++id, &url",
+    report: "++id, &url",
+    product: "++id, &pid, &barcode, &code, &createTime, &status, &remindTime, &listedTime",
   });
 
   console.log("Task:", context.task);
@@ -42,7 +43,7 @@ export async function execute(context: WorkflowContext) {
       const report_list = JSON.parse(result.task.extract_data || "[]");
       for (const item of report_list) {
         const url = item.trim();
-        const findUrl = await db.table('reportList').get({
+        const findUrl = await db.table('report').get({
           url: url
         })
         if (findUrl === undefined) {
@@ -50,9 +51,9 @@ export async function execute(context: WorkflowContext) {
           const data = await fetchAndParseXlsx(url);
           console.log(data);
 
-          await db.table('reportList').add({
+          await db.table('report').add({
             url: url,
-            timestamp: Date.now(),
+            timestamp: Math.floor(Date.now() / 1000),
           })
         }
       }
