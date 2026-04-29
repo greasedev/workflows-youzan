@@ -25,20 +25,7 @@ const operationLogs: OperationLog[] = [];
 
 type ProductListType = "new" | "transfer" | "return";
 
-const LIST_CONFIG: Record<ProductListType, { title: string; emptyText: string }> = {
-  new: {
-    title: "上新提醒列表",
-    emptyText: "暂无待上新商品",
-  },
-  transfer: {
-    title: "调货提醒列表",
-    emptyText: "暂无待调货商品",
-  },
-  return: {
-    title: "回库提醒列表",
-    emptyText: "暂无待回库商品",
-  },
-};
+const LIST_TYPES: ProductListType[] = ["new", "transfer", "return"];
 
 let activeListType: ProductListType = "new";
 
@@ -117,6 +104,15 @@ function getDisplayProducts(
   return [...pendingProducts, ...expiredRemindProducts].sort(
     (a: Product, b: Product) => b.createTime - a.createTime,
   );
+}
+
+/**
+ * 获取空状态文案
+ */
+function getEmptyText(listType: ProductListType): string {
+  if (listType === "transfer") return "暂无待调货商品";
+  if (listType === "return") return "暂无待回库商品";
+  return "暂无待上新商品";
 }
 
 /**
@@ -263,9 +259,6 @@ async function renderProducts(): Promise<void> {
   const tbody = document.getElementById("product-list");
   if (!tbody) return;
 
-  const listConfig = LIST_CONFIG[activeListType];
-  const listTitle = document.getElementById("list-title");
-  if (listTitle) listTitle.textContent = listConfig.title;
   renderTableHead(activeListType);
 
   // 从数据库查询所有商品
@@ -281,7 +274,7 @@ async function renderProducts(): Promise<void> {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                         </svg>
-                        <p>${listConfig.emptyText}</p>
+                        <p>${getEmptyText(activeListType)}</p>
                     </div>
                 </td>
             </tr>
@@ -295,7 +288,6 @@ async function renderProducts(): Promise<void> {
     bindProductEvents();
   }
 
-  updateListCount(displayProducts.length);
 }
 
 /**
@@ -338,18 +330,10 @@ function bindProductEvents(): void {
 }
 
 /**
- * 更新列表数量
- */
-function updateListCount(count: number): void {
-  const listCountEl = document.getElementById("list-count");
-  if (listCountEl) listCountEl.textContent = `共 ${count} 条`;
-}
-
-/**
  * 更新切换按钮上的列表数量
  */
 function updateTabCounts(allProducts: Product[]): void {
-  (Object.keys(LIST_CONFIG) as ProductListType[]).forEach((listType) => {
+  LIST_TYPES.forEach((listType) => {
     const countEl = document.querySelector(`[data-count-type="${listType}"]`);
     if (countEl) {
       countEl.textContent = String(getDisplayProducts(allProducts, listType).length);
