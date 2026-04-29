@@ -144,7 +144,7 @@ async function renderProducts(): Promise<void> {
   }
 
   // 更新统计数据
-  updateStats(displayProducts);
+  await updateStats(displayProducts);
 }
 
 /**
@@ -179,12 +179,30 @@ function bindProductEvents(): void {
 }
 
 /**
+ * 计算本周已上新数量
+ */
+async function getCompletedThisWeek(): Promise<number> {
+  const nowTimestamp = Math.floor(Date.now() / 1000);
+  // 计算本周开始时间（周一00:00:00）
+  const dayOfWeek = new Date(nowTimestamp * 1000).getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const weekStart = nowTimestamp - daysToMonday * 24 * 60 * 60 - (nowTimestamp % 86400);
+
+  const allProducts = await db.table<Product>("product").toArray();
+  return allProducts.filter(
+    (p) => p.status === "listed" && p.listedTime && p.listedTime >= weekStart,
+  ).length;
+}
+
+/**
  * 更新统计数据
  */
-function updateStats(pendingProducts: Product[]): void {
+async function updateStats(pendingProducts: Product[]): Promise<void> {
   const expiringCount = pendingProducts.filter(
     (p) => getDuration(p.createTime).isWarning,
   ).length;
+
+  completedThisWeek = await getCompletedThisWeek();
 
   const pendingEl = document.getElementById("pending-count");
   const expiringEl = document.getElementById("expiring-count");
@@ -268,13 +286,6 @@ async function handleMarkNew(productId: number): Promise<void> {
         operationTime: new Date(nowTimestamp * 1000).toISOString(),
         listedTime: new Date(nowTimestamp * 1000).toISOString(),
       });
-
-      // 计算本周已上新数量
-      const weekStart = nowTimestamp - (nowTimestamp % (7 * 24 * 60 * 60));
-      const allProducts = await db.table<Product>("product").toArray();
-      completedThisWeek = allProducts.filter(
-        (p) => p.listedTime && p.listedTime >= weekStart,
-      ).length;
 
       // 重新渲染
       await renderProducts();
