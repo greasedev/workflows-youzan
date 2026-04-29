@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@greaseclaw/workflow-sdk':
         specifier: github:greasedev/workflow-sdk#main
-        version: https://codeload.github.com/greasedev/workflow-sdk/tar.gz/987037426d5837f2c479ba7d4bfdcb472b0fc599(zod@3.25.76)
+        version: https://codeload.github.com/greasedev/workflow-sdk/tar.gz/a98e38520c95c73c6c737977cfc6b1d96d451c5c(zod@3.25.76)
     devDependencies:
       '@types/node':
         specifier: ^25.5.2
@@ -214,8 +214,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@greaseclaw/workflow-sdk@https://codeload.github.com/greasedev/workflow-sdk/tar.gz/987037426d5837f2c479ba7d4bfdcb472b0fc599':
-    resolution: {tarball: https://codeload.github.com/greasedev/workflow-sdk/tar.gz/987037426d5837f2c479ba7d4bfdcb472b0fc599}
+  '@greaseclaw/workflow-sdk@https://codeload.github.com/greasedev/workflow-sdk/tar.gz/a98e38520c95c73c6c737977cfc6b1d96d451c5c':
+    resolution: {tarball: https://codeload.github.com/greasedev/workflow-sdk/tar.gz/a98e38520c95c73c6c737977cfc6b1d96d451c5c}
     version: 0.0.1
     hasBin: true
     peerDependencies:
@@ -370,6 +370,10 @@ packages:
   eventsource-parser@3.0.8:
     resolution: {integrity: sha512-70QWGkr4snxr0OXLRWsFLeRBIRPuQOvt4s8QYjmUlmlkyTZkRqS7EDVRZtzU3TiyDbXSzaOeF0XUKy8PchzukQ==}
     engines: {node: '>=18.0.0'}
+
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
+    engines: {node: '>=18'}
 
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
@@ -714,11 +718,12 @@ snapshots:
   '@esbuild/win32-x64@0.27.7':
     optional: true
 
-  '@greaseclaw/workflow-sdk@https://codeload.github.com/greasedev/workflow-sdk/tar.gz/987037426d5837f2c479ba7d4bfdcb472b0fc599(zod@3.25.76)':
+  '@greaseclaw/workflow-sdk@https://codeload.github.com/greasedev/workflow-sdk/tar.gz/a98e38520c95c73c6c737977cfc6b1d96d451c5c(zod@3.25.76)':
     dependencies:
       '@ai-sdk/openai': 3.0.53(zod@3.25.76)
       ai: 6.0.168(zod@3.25.76)
       dexie: 4.4.2
+      fake-indexeddb: 6.2.5
       json5: 2.2.3
       zod: 3.25.76
       zod-to-json-schema: 3.25.2(zod@3.25.76)
@@ -844,6 +849,8 @@ snapshots:
       '@esbuild/win32-x64': 0.27.7
 
   eventsource-parser@3.0.8: {}
+
+  fake-indexeddb@6.2.5: {}
 
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:

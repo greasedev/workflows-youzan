@@ -49,7 +49,7 @@ export async function execute(context: WorkflowContext) {
 
           await db.table('reportList').add({
             url: url,
-            timestamp: Math.floor(Date.now() / 1000),
+            timestamp: Date.now(),
           })
         }
       }
