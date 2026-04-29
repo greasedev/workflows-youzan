@@ -19,7 +19,9 @@
  */
 
 import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
-import { createWorkflowApis, WorkflowApis } from "../api";
+import { createWorkflowApis } from "../api";
+import { fetchAndParseXlsx } from "../libs/xlsx";
+
 
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {
@@ -45,7 +47,8 @@ export async function execute(context: WorkflowContext) {
         })
         if (findUrl === undefined) {
           // 读取excel
-          
+          const data = await fetchAndParseXlsx(url);
+          console.log(data);
 
           await db.table('reportList').add({
             url: url,

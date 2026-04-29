@@ -3,100 +3,69 @@
  * 商品全流程跟踪系统前端逻辑
  */
 
-// 商品状态枚举
-enum ProductStatus {
-  Pending = "pending", // 待上新
-  Listed = "listed", // 已上新
-  RemindLater = "remind_later", // 3天后提醒
-  Returned = "returned", // 已回库
-}
-
-// 商品数据接口
-interface Product {
-  id: number;
-  name: string;
-  barcode: string;
-  image: string;
-  costPrice: number;
-  createTime: string;
-  status: ProductStatus;
-  listedTime?: string; // 上新时间
-  remindTime?: string; // 下次提醒时间
-}
-
-// 操作日志接口
-interface OperationLog {
-  productId: number;
-  productName: string;
-  operationType: string;
-  operationTime: string;
-  remindTime?: string;
-  listedTime?: string;
-}
-
-// 时间计算结果接口
-interface DurationResult {
-  days: number;
-  weeks: number;
-  text: string;
-  isWarning: boolean;
-}
+import { Product, OperationLog, DurationResult } from "../models/types";
 
 // 模拟商品数据（实际应从数据库/API获取）
 const products: Product[] = [
   {
-    id: 1,
+    pid: 1,
     name: "春季新款连衣裙",
     barcode: "SP20260421001",
+    code: "SP20260421001",
     image: "https://via.placeholder.com/60x60?text=商品1",
     costPrice: 158.0,
     createTime: "2026-03-24 10:30:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
   {
-    id: 2,
+    pid: 2,
     name: "夏季薄款T恤",
     barcode: "SP20260418002",
+    code: "SP20260418002",
     image: "https://via.placeholder.com/60x60?text=商品2",
     costPrice: 68.0,
     createTime: "2026-03-28 14:20:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
   {
-    id: 3,
+    pid: 3,
     name: "经典牛仔裤",
     barcode: "SP20260415003",
+    code: "SP20260415003",
     image: "https://via.placeholder.com/60x60?text=商品3",
     costPrice: 199.0,
     createTime: "2026-04-01 09:15:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
   {
-    id: 4,
+    pid: 4,
     name: "休闲运动鞋",
     barcode: "SP20260412004",
+    code: "SP20260412004",
     image: "https://via.placeholder.com/60x60?text=商品4",
     costPrice: 299.0,
     createTime: "2026-04-05 16:45:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
   {
-    id: 5,
+    pid: 5,
     name: "时尚帆布包",
     barcode: "SP20260410005",
+    code: "SP20260410005",
     image: "https://via.placeholder.com/60x60?text=商品5",
     costPrice: 89.0,
     createTime: "2026-04-08 11:00:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
   {
-    id: 6,
+    pid: 6,
     name: "纯棉短袖衬衫",
     barcode: "SP20260408006",
+    code: "SP20260408006",
     image: "https://via.placeholder.com/60x60?text=商品6",
     costPrice: 128.0,
     createTime: "2026-04-10 08:30:00",
-    status: ProductStatus.Pending,
+    status: "pending",
   },
 ];
 
@@ -139,7 +108,7 @@ function renderProducts(): void {
   if (!tbody) return;
 
   const pendingProducts = products.filter(
-    (p) => p.status === ProductStatus.Pending,
+    (p) => p.status === "pending",
   );
 
   if (pendingProducts.length === 0) {
@@ -166,7 +135,7 @@ function renderProducts(): void {
       .map((product: Product) => {
         const duration = getDuration(product.createTime);
         return `
-                <tr data-id="${product.id}">
+                <tr data-id="${product.pid}">
                     <td>
                         <div class="product-info">
                             <img class="product-img" src="${product.image}" alt="${product.name}" onclick="ProductApp.showImageModal('${product.image}', '${product.name}')">
@@ -189,8 +158,8 @@ function renderProducts(): void {
                     </td>
                     <td>
                         <div class="actions">
-                            <button class="btn btn-secondary" onclick="ProductApp.handleRemindLater(${product.id})">3天后提示</button>
-                            <button class="btn btn-primary" onclick="ProductApp.handleMarkNew(${product.id})">已上新</button>
+                            <button class="btn btn-secondary" onclick="ProductApp.handleRemindLater(${product.pid})">3天后提示</button>
+                            <button class="btn btn-primary" onclick="ProductApp.handleMarkNew(${product.pid})">已上新</button>
                         </div>
                     </td>
                 </tr>
@@ -226,7 +195,7 @@ function updateStats(pendingProducts: Product[]): void {
  * 3天后提示
  */
 function handleRemindLater(productId: number): void {
-  const product = products.find((p) => p.id === productId);
+  const product = products.find((p) => p.pid === productId);
   if (!product) return;
 
   showModal(
@@ -246,7 +215,7 @@ function handleRemindLater(productId: number): void {
       });
 
       // 从当前列表移除（实际应设置下次提醒时间）
-      product.status = ProductStatus.RemindLater;
+      product.status = "remind_later";
       product.remindTime = remindTime.toISOString();
 
       // 重新渲染
@@ -261,7 +230,7 @@ function handleRemindLater(productId: number): void {
  * 已上新
  */
 function handleMarkNew(productId: number): void {
-  const product = products.find((p) => p.id === productId);
+  const product = products.find((p) => p.pid === productId);
   if (!product) return;
 
   showModal(
@@ -270,7 +239,7 @@ function handleMarkNew(productId: number): void {
     () => {
       // 记录上新时间
       const now = new Date();
-      product.status = ProductStatus.Listed;
+      product.status = "listed";
       product.listedTime = now.toISOString();
 
       // 记录操作
