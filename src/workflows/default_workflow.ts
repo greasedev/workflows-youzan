@@ -22,7 +22,6 @@ import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
 import { fetchAndParseXlsx } from "../libs/xlsx";
 
-
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
@@ -30,7 +29,8 @@ export async function execute(context: WorkflowContext) {
   const db = agent.getDb();
   db.version(1).stores({
     report: "++id, &url",
-    product: "++id, &pid, &barcode, &code, &createTime, &status, &remindTime, &listedTime",
+    product:
+      "++id, &pid, &barcode, &code, createTime, status, remindTime, listedTime",
   });
 
   console.log("Task:", context.task);
@@ -43,18 +43,22 @@ export async function execute(context: WorkflowContext) {
       const report_list = JSON.parse(result.task.extract_data || "[]");
       for (const item of report_list) {
         const url = item.trim();
-        const findUrl = await db.table('report').get({
-          url: url
-        })
+        const findUrl = await db.table("report").get({
+          url: url,
+        });
         if (findUrl === undefined) {
-          // 读取excel
-          const data = await fetchAndParseXlsx(url);
-          console.log(data);
-
-          await db.table('report').add({
+          const products = await fetchAndParseXlsx(url);
+          for (const product of products) {
+            try {
+              await db.table("product").add(product);
+            } catch (e) {
+              if (e instanceof Dexie.ConstraintError) continue;
+            }
+          }
+          await db.table("report").add({
             url: url,
             timestamp: Math.floor(Date.now() / 1000),
-          })
+          });
         }
       }
     }
