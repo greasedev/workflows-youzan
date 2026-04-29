@@ -1,15 +1,7 @@
 /**
  * ---
- * name: Default Workflow
- * description: "Default workflow entry point"
- *
- * use when:
- * - User requests an action
- *
- * input:
- * - name: foo
- *   description: describe param foo
- *   required: true
+ * name: 有赞商品数据导入工作流
+ * description: 从有赞系统中导出的xlsx文件中导入商品数据到数据库中，更新数据库中的商品信息。
  *
  * output:
  * - success: bool
@@ -18,7 +10,7 @@
  * ---
  */
 
-import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
+import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
 import { fetchAndParseXlsx } from "../libs/xlsx";
 
@@ -52,7 +44,7 @@ export async function execute(context: WorkflowContext) {
             try {
               await db.table("product").add(product);
             } catch (e) {
-              // if (e instanceof Dexie.ConstraintError) continue;
+              if (e instanceof Dexie.ConstraintError) continue;
             }
           }
           await db.table("report").add({

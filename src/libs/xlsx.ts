@@ -4,7 +4,7 @@ import type { Product } from '../models/types';
 // Excel 列名到 Product 字段的映射
 const COLUMN_MAPPING: Record<string, keyof Product> = {
   '规格id': 'pid',
-  '商品名字': 'name',
+  '商品名称': 'name',
   '规格条码': 'barcode',
   '规格编码': 'code',
   '零售价': 'costPrice',
