@@ -3,65 +3,22 @@
  * 商品全流程跟踪系统前端逻辑
  */
 
+import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
 import { Product, OperationLog, DurationResult } from "../models/types";
 
-// 模拟商品数据（实际应从数据库/API获取）
-const products: Product[] = [
-  {
-    pid: 1,
-    name: "春季新款连衣裙",
-    barcode: "SP20260421001",
-    code: "SP20260421001",
-    costPrice: 158.0,
-    createTime: 1745374200, // 2026-03-24 10:30:00
-    status: "pending",
-  },
-  {
-    pid: 2,
-    name: "夏季薄款T恤",
-    barcode: "SP20260418002",
-    code: "SP20260418002",
-    costPrice: 68.0,
-    createTime: 1745821200, // 2026-03-28 14:20:00
-    status: "pending",
-  },
-  {
-    pid: 3,
-    name: "经典牛仔裤",
-    barcode: "SP20260415003",
-    code: "SP20260415003",
-    costPrice: 199.0,
-    createTime: 1746470100, // 2026-04-01 09:15:00
-    status: "pending",
-  },
-  {
-    pid: 4,
-    name: "休闲运动鞋",
-    barcode: "SP20260412004",
-    code: "SP20260412004",
-    costPrice: 299.0,
-    createTime: 1746866700, // 2026-04-05 16:45:00
-    status: "pending",
-  },
-  {
-    pid: 5,
-    name: "时尚帆布包",
-    barcode: "SP20260410005",
-    code: "SP20260410005",
-    costPrice: 89.0,
-    createTime: 1747086000, // 2026-04-08 11:00:00
-    status: "pending",
-  },
-  {
-    pid: 6,
-    name: "纯棉短袖衬衫",
-    barcode: "SP20260408006",
-    code: "SP20260408006",
-    costPrice: 128.0,
-    createTime: 1747233000, // 2026-04-10 08:30:00
-    status: "pending",
-  },
-];
+// 扩展 Window 类型以包含 agentOptions
+declare global {
+  interface Window {
+    agentOptions?: AgentOptions;
+  }
+}
+
+// 创建 Agent 实例并初始化数据库
+const agent = new Agent(window.agentOptions || {});
+const db = agent.getDb();
+db.version(1).stores({
+  product: "++id, &pid, &barcode, &code, createTime, status, remindTime, listedTime",
+});
 
 // 操作记录（模拟）
 const operationLogs: OperationLog[] = [];
@@ -107,15 +64,26 @@ function formatPrice(price: number): string {
 /**
  * 渲染商品列表
  */
-function renderProducts(): void {
+async function renderProducts(): Promise<void> {
   const tbody = document.getElementById("product-list");
   if (!tbody) return;
 
-  const pendingProducts = products.filter(
-    (p) => p.status === "pending",
+  // 从数据库查询所有商品
+  const allProducts = await db.table<Product>("product").toArray();
+
+  // 过滤出 status 为 pending 的商品
+  const pendingProducts = allProducts.filter((p) => p.status === "pending");
+
+  // 过滤出 remindTime 已到且 status 为 remind_later 的商品
+  const nowTimestamp = Math.floor(Date.now() / 1000);
+  const expiredRemindProducts = allProducts.filter(
+    (p) => p.status === "remind_later" && p.remindTime && p.remindTime <= nowTimestamp,
   );
 
-  if (pendingProducts.length === 0) {
+  // 合并待处理商品
+  const displayProducts = [...pendingProducts, ...expiredRemindProducts];
+
+  if (displayProducts.length === 0) {
     tbody.innerHTML = `
             <tr>
                 <td colspan="5">
@@ -130,16 +98,16 @@ function renderProducts(): void {
         `;
   } else {
     // 按建档时间降序排列（优先展示即将超期的）
-    pendingProducts.sort((a, b) => b.createTime - a.createTime);
+    displayProducts.sort((a: Product, b: Product) => b.createTime - a.createTime);
 
-    tbody.innerHTML = pendingProducts
+    tbody.innerHTML = displayProducts
       .map((product: Product) => {
         const duration = getDuration(product.createTime);
         const imageHtml = product.image
-          ? `<img class="product-img" src="${product.image}" alt="${product.name}" onclick="ProductApp.showImageModal('${product.image}', '${product.name}')">`
-          : '';
+          ? `<img class="product-img" src="${product.image}" alt="${product.name}" data-image="${product.image}" data-name="${product.name}">`
+          : "";
         return `
-                <tr data-id="${product.pid}">
+                <tr data-pid="${product.pid}">
                     <td>
                         <div class="product-info">
                             ${imageHtml}
@@ -162,18 +130,52 @@ function renderProducts(): void {
                     </td>
                     <td>
                         <div class="actions">
-                            <button class="btn btn-secondary" onclick="ProductApp.handleRemindLater(${product.pid})">3天后提示</button>
-                            <button class="btn btn-primary" onclick="ProductApp.handleMarkNew(${product.pid})">已上新</button>
+                            <button class="btn btn-secondary remind-btn" data-pid="${product.pid}">3天后提醒</button>
+                            <button class="btn btn-primary mark-new-btn" data-pid="${product.pid}">上新</button>
                         </div>
                     </td>
                 </tr>
             `;
       })
       .join("");
+
+    // 动态绑定事件（避免 CSP 禁止 inline onclick）
+    bindProductEvents();
   }
 
   // 更新统计数据
-  updateStats(pendingProducts);
+  updateStats(displayProducts);
+}
+
+/**
+ * 动态绑定商品列表事件（避免 CSP 禁止 inline onclick）
+ */
+function bindProductEvents(): void {
+  // 绑定"3天后提醒"按钮
+  document.querySelectorAll(".remind-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
+      handleRemindLater(pid).catch(() => showToast("操作失败", "error"));
+    });
+  });
+
+  // 绑定"上新"按钮
+  document.querySelectorAll(".mark-new-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
+      handleMarkNew(pid).catch(() => showToast("操作失败", "error"));
+    });
+  });
+
+  // 绑定图片点击事件
+  document.querySelectorAll(".product-img").forEach((img) => {
+    img.addEventListener("click", (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const imageUrl = target.dataset.image || "";
+      const productName = target.dataset.name || "";
+      showImageModal(imageUrl, productName);
+    });
+  });
 }
 
 /**
@@ -198,14 +200,17 @@ function updateStats(pendingProducts: Product[]): void {
 /**
  * 3天后提示
  */
-function handleRemindLater(productId: number): void {
-  const product = products.find((p) => p.pid === productId);
-  if (!product) return;
+async function handleRemindLater(productId: number): Promise<void> {
+  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+  if (!product) {
+    showToast("未找到商品", "error");
+    return;
+  }
 
   showModal(
     "确认延迟提醒",
     `确定将「${product.name}」设置为3天后再次提醒吗？`,
-    () => {
+    async () => {
       // 记录操作
       const nowTimestamp = Math.floor(Date.now() / 1000);
       const remindTimestamp = nowTimestamp + 3 * 24 * 60 * 60;
@@ -218,12 +223,14 @@ function handleRemindLater(productId: number): void {
         remindTime: new Date(remindTimestamp * 1000).toISOString(),
       });
 
-      // 从当前列表移除（实际应设置下次提醒时间）
-      product.status = "remind_later";
-      product.remindTime = remindTimestamp;
+      // 更新数据库
+      await db.table("product").update(product.id, {
+        status: "remind_later",
+        remindTime: remindTimestamp,
+      });
 
       // 重新渲染
-      renderProducts();
+      await renderProducts();
 
       showToast(`已设置3天后提醒「${product.name}」`, "success");
     },
@@ -233,18 +240,25 @@ function handleRemindLater(productId: number): void {
 /**
  * 已上新
  */
-function handleMarkNew(productId: number): void {
-  const product = products.find((p) => p.pid === productId);
-  if (!product) return;
+async function handleMarkNew(productId: number): Promise<void> {
+  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+  if (!product) {
+    showToast("未找到商品", "error");
+    return;
+  }
 
   showModal(
     "确认上新",
     `确定将「${product.name}」标记为已上新吗？此操作将记录上新时间并进入调货提醒流程。`,
-    () => {
+    async () => {
       // 记录上新时间
       const nowTimestamp = Math.floor(Date.now() / 1000);
-      product.status = "listed";
-      product.listedTime = nowTimestamp;
+
+      // 更新数据库
+      await db.table("product").update(product.id, {
+        status: "listed",
+        listedTime: nowTimestamp,
+      });
 
       // 记录操作
       operationLogs.push({
@@ -255,10 +269,15 @@ function handleMarkNew(productId: number): void {
         listedTime: new Date(nowTimestamp * 1000).toISOString(),
       });
 
-      completedThisWeek++;
+      // 计算本周已上新数量
+      const weekStart = nowTimestamp - (nowTimestamp % (7 * 24 * 60 * 60));
+      const allProducts = await db.table<Product>("product").toArray();
+      completedThisWeek = allProducts.filter(
+        (p) => p.listedTime && p.listedTime >= weekStart,
+      ).length;
 
       // 重新渲染
-      renderProducts();
+      await renderProducts();
 
       showToast(`已标记「${product.name}」为上新状态`, "success");
     },
@@ -275,7 +294,11 @@ function showImageModal(imageUrl: string, productName: string): void {
 /**
  * 显示确认弹窗
  */
-function showModal(title: string, body: string, onConfirm: () => void): void {
+function showModal(
+  title: string,
+  body: string,
+  onConfirm: () => void | Promise<void>,
+): void {
   const modal = document.getElementById("confirm-modal");
   const modalTitle = document.getElementById("modal-title");
   const modalBody = document.getElementById("modal-body");
@@ -286,9 +309,9 @@ function showModal(title: string, body: string, onConfirm: () => void): void {
   modalTitle.textContent = title;
   modalBody.textContent = body;
 
-  // 设置确认按钮点击事件
-  confirmBtn.onclick = () => {
-    onConfirm();
+  // 设置确认按钮点击事件（支持异步回调）
+  confirmBtn.onclick = async () => {
+    await onConfirm();
     closeModal();
   };
 
@@ -354,11 +377,11 @@ function getOperationLogs(): OperationLog[] {
 /**
  * 获取商品列表（供外部调用）
  */
-function getProducts(): Product[] {
-  return products;
+async function getProducts(): Promise<Product[]> {
+  return await db.table<Product>("product").toArray();
 }
 
-// 导出全局对象供 HTML onclick 使用
+// 导出全局对象（供外部调用或调试）
 const ProductApp = {
   handleRemindLater,
   handleMarkNew,
@@ -367,12 +390,10 @@ const ProductApp = {
   getProducts,
 };
 
-// 将 ProductApp 挂载到 window（使用类型断言）
 (window as any).ProductApp = ProductApp;
 
 // 页面加载完成后初始化
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   initEventListeners();
-  renderProducts();
-  console.log("操作日志:", operationLogs);
+  await renderProducts();
 });

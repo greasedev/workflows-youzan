@@ -3,6 +3,7 @@ type ProductStatus = "pending" | "listed" | "remind_later" | "returned";
 
 // 商品数据接口
 export interface Product {
+  id?: number; // 数据库自增主键（可选，仅在数据库记录中存在）
   pid: number;
   name: string;
   barcode: string;
