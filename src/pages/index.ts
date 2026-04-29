@@ -22,7 +22,6 @@ db.version(1).stores({
 
 // 操作记录（模拟）
 const operationLogs: OperationLog[] = [];
-let completedThisWeek: number = 0;
 
 /**
  * 计算距离建档的时间
@@ -143,8 +142,7 @@ async function renderProducts(): Promise<void> {
     bindProductEvents();
   }
 
-  // 更新统计数据
-  await updateStats(displayProducts);
+  updateListCount(displayProducts.length);
 }
 
 /**
@@ -179,40 +177,11 @@ function bindProductEvents(): void {
 }
 
 /**
- * 计算本周已上新数量
+ * 更新列表数量
  */
-async function getCompletedThisWeek(): Promise<number> {
-  const nowTimestamp = Math.floor(Date.now() / 1000);
-  // 计算本周开始时间（周一00:00:00）
-  const dayOfWeek = new Date(nowTimestamp * 1000).getDay();
-  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  const weekStart = nowTimestamp - daysToMonday * 24 * 60 * 60 - (nowTimestamp % 86400);
-
-  const allProducts = await db.table<Product>("product").toArray();
-  return allProducts.filter(
-    (p) => p.status === "listed" && p.listedTime && p.listedTime >= weekStart,
-  ).length;
-}
-
-/**
- * 更新统计数据
- */
-async function updateStats(pendingProducts: Product[]): Promise<void> {
-  const expiringCount = pendingProducts.filter(
-    (p) => getDuration(p.createTime).isWarning,
-  ).length;
-
-  completedThisWeek = await getCompletedThisWeek();
-
-  const pendingEl = document.getElementById("pending-count");
-  const expiringEl = document.getElementById("expiring-count");
-  const completedEl = document.getElementById("completed-count");
+function updateListCount(count: number): void {
   const listCountEl = document.getElementById("list-count");
-
-  if (pendingEl) pendingEl.textContent = String(pendingProducts.length);
-  if (expiringEl) expiringEl.textContent = String(expiringCount);
-  if (completedEl) completedEl.textContent = String(completedThisWeek);
-  if (listCountEl) listCountEl.textContent = `共 ${pendingProducts.length} 条`;
+  if (listCountEl) listCountEl.textContent = `共 ${count} 条`;
 }
 
 /**
