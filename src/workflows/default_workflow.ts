@@ -52,20 +52,20 @@ export async function execute(context: WorkflowContext) {
             try {
               await db.table("product").add(product);
             } catch (e) {
-              if (e instanceof Dexie.ConstraintError) continue;
+              // if (e instanceof Dexie.ConstraintError) continue;
             }
           }
           await db.table("report").add({
             url: url,
             timestamp: Math.floor(Date.now() / 1000),
           });
+        } else {
+          console.log(`Report ${url} already exists`);
         }
       }
     }
-
-    console.log(result);
   } catch (error) {
-    console.error("Workflow  error:", error);
+    console.error("Workflow error:", error);
     return {
       success: false,
       message: "Workflow failed",
