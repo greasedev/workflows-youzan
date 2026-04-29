@@ -13,14 +13,29 @@
             <p>AI Agent 商品全流程跟踪系统</p>
         </div>
 
+        <div class="list-tabs" role="tablist" aria-label="提醒列表切换">
+            <button class="tab-btn active" type="button" data-list-type="new" role="tab" aria-selected="true">
+                <span>上新提醒</span>
+                <span class="tab-count" data-count-type="new">0</span>
+            </button>
+            <button class="tab-btn" type="button" data-list-type="transfer" role="tab" aria-selected="false">
+                <span>调货提醒</span>
+                <span class="tab-count" data-count-type="transfer">0</span>
+            </button>
+            <button class="tab-btn" type="button" data-list-type="return" role="tab" aria-selected="false">
+                <span>回库提醒</span>
+                <span class="tab-count" data-count-type="return">0</span>
+            </button>
+        </div>
+
         <div class="table-container">
             <div class="table-header">
-                <h2>上新提醒列表</h2>
+                <h2 id="list-title">上新提醒列表</h2>
                 <span class="count" id="list-count">共 0 条</span>
             </div>
             <table>
                 <thead>
-                    <tr>
+                    <tr id="product-table-head">
                         <th style="width: 200px;">商品信息</th>
                         <th style="width: 100px;">成本价格</th>
                         <th style="width: 180px;">建档时间</th>

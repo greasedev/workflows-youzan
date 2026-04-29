@@ -14,6 +14,7 @@ export interface Product {
   image?: string;
   listedTime?: number; // 上新时间，秒时间戳
   remindTime?: number; // 下次提醒时间，秒时间戳
+  returnedTime?: number; // 回库时间，秒时间戳
 }
 
 // 操作日志接口

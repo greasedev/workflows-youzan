@@ -35,6 +35,61 @@ body {
     opacity: 0.9;
 }
 
+.list-tabs {
+    display: inline-flex;
+    gap: 4px;
+    background: #eef1f5;
+    padding: 4px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+}
+
+.tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 96px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #666;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    color: #333;
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.tab-btn.active {
+    background: white;
+    color: #333;
+    font-weight: 500;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.tab-count {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: rgba(102, 126, 234, 0.12);
+    color: #667eea;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.tab-btn.active .tab-count {
+    background: #667eea;
+    color: white;
+}
+
 .table-container {
     background: white;
     border-radius: 12px;
@@ -260,6 +315,18 @@ tr:last-child td {
 }
 
 @media (max-width: 768px) {
+    .list-tabs {
+        display: flex;
+        width: 100%;
+    }
+
+    .tab-btn {
+        flex: 1;
+        min-width: 0;
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+
     table {
         font-size: 12px;
     }

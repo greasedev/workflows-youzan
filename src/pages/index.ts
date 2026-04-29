@@ -23,6 +23,25 @@ db.version(1).stores({
 // 操作记录（模拟）
 const operationLogs: OperationLog[] = [];
 
+type ProductListType = "new" | "transfer" | "return";
+
+const LIST_CONFIG: Record<ProductListType, { title: string; emptyText: string }> = {
+  new: {
+    title: "上新提醒列表",
+    emptyText: "暂无待上新商品",
+  },
+  transfer: {
+    title: "调货提醒列表",
+    emptyText: "暂无待调货商品",
+  },
+  return: {
+    title: "回库提醒列表",
+    emptyText: "暂无待回库商品",
+  },
+};
+
+let activeListType: ProductListType = "new";
+
 /**
  * 计算距离建档的时间
  */
@@ -61,14 +80,30 @@ function formatPrice(price: number): string {
 }
 
 /**
- * 渲染商品列表
+ * 格式化可选时间
  */
-async function renderProducts(): Promise<void> {
-  const tbody = document.getElementById("product-list");
-  if (!tbody) return;
+function formatOptionalDate(timestamp?: number): string {
+  return timestamp ? formatDate(timestamp) : "-";
+}
 
-  // 从数据库查询所有商品
-  const allProducts = await db.table<Product>("product").toArray();
+/**
+ * 过滤当前列表需要展示的商品
+ */
+function getDisplayProducts(
+  allProducts: Product[],
+  listType: ProductListType,
+): Product[] {
+  if (listType === "transfer") {
+    return allProducts
+      .filter((p) => p.status === "listed")
+      .sort((a, b) => (b.listedTime || 0) - (a.listedTime || 0));
+  }
+
+  if (listType === "return") {
+    return allProducts
+      .filter((p) => p.status === "returned")
+      .sort((a, b) => (b.returnedTime || 0) - (a.returnedTime || 0));
+  }
 
   // 过滤出 status 为 pending 的商品
   const pendingProducts = allProducts.filter((p) => p.status === "pending");
@@ -79,8 +114,164 @@ async function renderProducts(): Promise<void> {
     (p) => p.status === "remind_later" && p.remindTime && p.remindTime <= nowTimestamp,
   );
 
-  // 合并待处理商品
-  const displayProducts = [...pendingProducts, ...expiredRemindProducts];
+  return [...pendingProducts, ...expiredRemindProducts].sort(
+    (a: Product, b: Product) => b.createTime - a.createTime,
+  );
+}
+
+/**
+ * 渲染表头
+ */
+function renderTableHead(listType: ProductListType): void {
+  const tableHead = document.getElementById("product-table-head");
+  if (!tableHead) return;
+
+  if (listType === "transfer") {
+    tableHead.innerHTML = `
+      <th style="width: 200px;">商品信息</th>
+      <th style="width: 100px;">成本价格</th>
+      <th style="width: 180px;">上新时间</th>
+      <th style="width: 100px;">上新时长</th>
+      <th style="width: 180px;">操作</th>
+    `;
+    return;
+  }
+
+  if (listType === "return") {
+    tableHead.innerHTML = `
+      <th style="width: 200px;">商品信息</th>
+      <th style="width: 100px;">成本价格</th>
+      <th style="width: 180px;">回库时间</th>
+      <th style="width: 100px;">当前状态</th>
+      <th style="width: 180px;">操作</th>
+    `;
+    return;
+  }
+
+  tableHead.innerHTML = `
+    <th style="width: 200px;">商品信息</th>
+    <th style="width: 100px;">成本价格</th>
+    <th style="width: 180px;">建档时间</th>
+    <th style="width: 100px;">距离建档</th>
+    <th style="width: 180px;">操作</th>
+  `;
+}
+
+/**
+ * 渲染商品信息单元格
+ */
+function renderProductInfo(product: Product): string {
+  const imageHtml = product.image
+    ? `<img class="product-img" src="${product.image}" alt="${product.name}" data-image="${product.image}" data-name="${product.name}">`
+    : "";
+
+  return `
+    <div class="product-info">
+      ${imageHtml}
+      <div>
+        <div class="product-name">${product.name}</div>
+        <div class="product-barcode">条码: ${product.barcode}</div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * 渲染单行商品
+ */
+function renderProductRow(product: Product, listType: ProductListType): string {
+  if (listType === "transfer") {
+    const listedDuration = product.listedTime ? getDuration(product.listedTime) : undefined;
+
+    return `
+      <tr data-pid="${product.pid}">
+        <td>${renderProductInfo(product)}</td>
+        <td>${formatPrice(product.costPrice)}</td>
+        <td>
+          <div class="time-info">
+            <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
+          </div>
+        </td>
+        <td>
+          <div class="time-info">
+            <div class="duration ${listedDuration?.isWarning ? "warning" : ""}">${listedDuration?.text || "-"}</div>
+          </div>
+        </td>
+        <td>
+          <div class="actions">
+            <button class="btn btn-primary mark-returned-btn" data-pid="${product.pid}">回库</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  if (listType === "return") {
+    return `
+      <tr data-pid="${product.pid}">
+        <td>${renderProductInfo(product)}</td>
+        <td>${formatPrice(product.costPrice)}</td>
+        <td>
+          <div class="time-info">
+            <div class="create-time">${formatOptionalDate(product.returnedTime)}</div>
+          </div>
+        </td>
+        <td>
+          <div class="time-info">
+            <div class="duration">已回库</div>
+          </div>
+        </td>
+        <td>
+          <div class="actions">
+            <button class="btn btn-secondary" disabled>已完成</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  const duration = getDuration(product.createTime);
+
+  return `
+    <tr data-pid="${product.pid}">
+      <td>${renderProductInfo(product)}</td>
+      <td>${formatPrice(product.costPrice)}</td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatDate(product.createTime)}</div>
+        </div>
+      </td>
+      <td>
+        <div class="time-info">
+          <div class="duration ${duration.isWarning ? "warning" : ""}">${duration.text}</div>
+        </div>
+      </td>
+      <td>
+        <div class="actions">
+          <button class="btn btn-secondary remind-btn" data-pid="${product.pid}">3天后提醒</button>
+          <button class="btn btn-primary mark-new-btn" data-pid="${product.pid}">上新</button>
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+/**
+ * 渲染商品列表
+ */
+async function renderProducts(): Promise<void> {
+  const tbody = document.getElementById("product-list");
+  if (!tbody) return;
+
+  const listConfig = LIST_CONFIG[activeListType];
+  const listTitle = document.getElementById("list-title");
+  if (listTitle) listTitle.textContent = listConfig.title;
+  renderTableHead(activeListType);
+
+  // 从数据库查询所有商品
+  const allProducts = await db.table<Product>("product").toArray();
+  updateTabCounts(allProducts);
+  const displayProducts = getDisplayProducts(allProducts, activeListType);
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
@@ -90,52 +281,14 @@ async function renderProducts(): Promise<void> {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                         </svg>
-                        <p>暂无待上新商品</p>
+                        <p>${listConfig.emptyText}</p>
                     </div>
                 </td>
             </tr>
         `;
   } else {
-    // 按建档时间降序排列（优先展示即将超期的）
-    displayProducts.sort((a: Product, b: Product) => b.createTime - a.createTime);
-
     tbody.innerHTML = displayProducts
-      .map((product: Product) => {
-        const duration = getDuration(product.createTime);
-        const imageHtml = product.image
-          ? `<img class="product-img" src="${product.image}" alt="${product.name}" data-image="${product.image}" data-name="${product.name}">`
-          : "";
-        return `
-                <tr data-pid="${product.pid}">
-                    <td>
-                        <div class="product-info">
-                            ${imageHtml}
-                            <div>
-                                <div class="product-name">${product.name}</div>
-                                <div class="product-barcode">条码: ${product.barcode}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>${formatPrice(product.costPrice)}</td>
-                    <td>
-                        <div class="time-info">
-                            <div class="create-time">${formatDate(product.createTime)}</div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="time-info">
-                            <div class="duration ${duration.isWarning ? "warning" : ""}">${duration.text}</div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="actions">
-                            <button class="btn btn-secondary remind-btn" data-pid="${product.pid}">3天后提醒</button>
-                            <button class="btn btn-primary mark-new-btn" data-pid="${product.pid}">上新</button>
-                        </div>
-                    </td>
-                </tr>
-            `;
-      })
+      .map((product: Product) => renderProductRow(product, activeListType))
       .join("");
 
     // 动态绑定事件（避免 CSP 禁止 inline onclick）
@@ -165,6 +318,14 @@ function bindProductEvents(): void {
     });
   });
 
+  // 绑定"回库"按钮
+  document.querySelectorAll(".mark-returned-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
+      handleMarkReturned(pid).catch(() => showToast("操作失败", "error"));
+    });
+  });
+
   // 绑定图片点击事件
   document.querySelectorAll(".product-img").forEach((img) => {
     img.addEventListener("click", (e) => {
@@ -182,6 +343,18 @@ function bindProductEvents(): void {
 function updateListCount(count: number): void {
   const listCountEl = document.getElementById("list-count");
   if (listCountEl) listCountEl.textContent = `共 ${count} 条`;
+}
+
+/**
+ * 更新切换按钮上的列表数量
+ */
+function updateTabCounts(allProducts: Product[]): void {
+  (Object.keys(LIST_CONFIG) as ProductListType[]).forEach((listType) => {
+    const countEl = document.querySelector(`[data-count-type="${listType}"]`);
+    if (countEl) {
+      countEl.textContent = String(getDisplayProducts(allProducts, listType).length);
+    }
+  });
 }
 
 /**
@@ -265,6 +438,41 @@ async function handleMarkNew(productId: number): Promise<void> {
 }
 
 /**
+ * 已回库
+ */
+async function handleMarkReturned(productId: number): Promise<void> {
+  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+  if (!product) {
+    showToast("未找到商品", "error");
+    return;
+  }
+
+  showModal(
+    "确认回库",
+    `确定将「${product.name}」标记为已回库吗？`,
+    async () => {
+      const nowTimestamp = Math.floor(Date.now() / 1000);
+
+      await db.table("product").update(product.id, {
+        status: "returned",
+        returnedTime: nowTimestamp,
+      });
+
+      operationLogs.push({
+        productId: productId,
+        productName: product.name,
+        operationType: "已回库",
+        operationTime: new Date(nowTimestamp * 1000).toISOString(),
+      });
+
+      await renderProducts();
+
+      showToast(`已标记「${product.name}」为回库状态`, "success");
+    },
+  );
+}
+
+/**
  * 显示图片放大弹窗（简化版）
  */
 function showImageModal(imageUrl: string, productName: string): void {
@@ -330,6 +538,18 @@ function showToast(
  * 初始化事件监听
  */
 function initEventListeners(): void {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const target = e.currentTarget as HTMLElement;
+      const listType = target.dataset.listType as ProductListType | undefined;
+      if (!listType || listType === activeListType) return;
+
+      activeListType = listType;
+      updateActiveTab(listType);
+      await renderProducts();
+    });
+  });
+
   // 点击弹窗外部关闭
   const modal = document.getElementById("confirm-modal");
   if (modal) {
@@ -345,6 +565,17 @@ function initEventListeners(): void {
   if (cancelBtn) {
     cancelBtn.addEventListener("click", closeModal);
   }
+}
+
+/**
+ * 更新列表切换状态
+ */
+function updateActiveTab(listType: ProductListType): void {
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    const isActive = (btn as HTMLElement).dataset.listType === listType;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", String(isActive));
+  });
 }
 
 /**
@@ -365,6 +596,7 @@ async function getProducts(): Promise<Product[]> {
 const ProductApp = {
   handleRemindLater,
   handleMarkNew,
+  handleMarkReturned,
   showImageModal,
   getOperationLogs,
   getProducts,
