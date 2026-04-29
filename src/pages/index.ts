@@ -14,7 +14,7 @@ const products: Product[] = [
     code: "SP20260421001",
     image: "https://via.placeholder.com/60x60?text=商品1",
     costPrice: 158.0,
-    createTime: "2026-03-24 10:30:00",
+    createTime: 1745374200, // 2026-03-24 10:30:00
     status: "pending",
   },
   {
@@ -24,7 +24,7 @@ const products: Product[] = [
     code: "SP20260418002",
     image: "https://via.placeholder.com/60x60?text=商品2",
     costPrice: 68.0,
-    createTime: "2026-03-28 14:20:00",
+    createTime: 1745821200, // 2026-03-28 14:20:00
     status: "pending",
   },
   {
@@ -34,7 +34,7 @@ const products: Product[] = [
     code: "SP20260415003",
     image: "https://via.placeholder.com/60x60?text=商品3",
     costPrice: 199.0,
-    createTime: "2026-04-01 09:15:00",
+    createTime: 1746470100, // 2026-04-01 09:15:00
     status: "pending",
   },
   {
@@ -44,7 +44,7 @@ const products: Product[] = [
     code: "SP20260412004",
     image: "https://via.placeholder.com/60x60?text=商品4",
     costPrice: 299.0,
-    createTime: "2026-04-05 16:45:00",
+    createTime: 1746866700, // 2026-04-05 16:45:00
     status: "pending",
   },
   {
@@ -54,7 +54,7 @@ const products: Product[] = [
     code: "SP20260410005",
     image: "https://via.placeholder.com/60x60?text=商品5",
     costPrice: 89.0,
-    createTime: "2026-04-08 11:00:00",
+    createTime: 1747086000, // 2026-04-08 11:00:00
     status: "pending",
   },
   {
@@ -64,7 +64,7 @@ const products: Product[] = [
     code: "SP20260408006",
     image: "https://via.placeholder.com/60x60?text=商品6",
     costPrice: 128.0,
-    createTime: "2026-04-10 08:30:00",
+    createTime: 1747233000, // 2026-04-10 08:30:00
     status: "pending",
   },
 ];
@@ -76,12 +76,8 @@ let completedThisWeek: number = 0;
 /**
  * 计算距离建档的时间
  */
-function getDuration(createTime: string): DurationResult {
-  const create = new Date(createTime);
-  const now = new Date();
-  const diffDays = Math.floor(
-    (now.getTime() - create.getTime()) / (1000 * 60 * 60 * 24),
-  );
+function getDuration(createTime: number): DurationResult {
+  const diffDays = Math.floor((Date.now() / 1000 - createTime) / 86400);
   const weeks = Math.floor(diffDays / 7);
   const days = diffDays % 7;
 
@@ -91,6 +87,20 @@ function getDuration(createTime: string): DurationResult {
     text: weeks > 0 ? `${weeks}周${days}天` : `${days}天`,
     isWarning: diffDays >= 21, // 3周及以上显示警告
   };
+}
+
+/**
+ * 格式化时间戳为日期时间字符串
+ */
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 /**
@@ -126,10 +136,7 @@ function renderProducts(): void {
         `;
   } else {
     // 按建档时间降序排列（优先展示即将超期的）
-    pendingProducts.sort(
-      (a, b) =>
-        new Date(b.createTime).getTime() - new Date(a.createTime).getTime(),
-    );
+    pendingProducts.sort((a, b) => b.createTime - a.createTime);
 
     tbody.innerHTML = pendingProducts
       .map((product: Product) => {
@@ -148,7 +155,7 @@ function renderProducts(): void {
                     <td>${formatPrice(product.costPrice)}</td>
                     <td>
                         <div class="time-info">
-                            <div class="create-time">${product.createTime.split(" ")[0]}</div>
+                            <div class="create-time">${formatDate(product.createTime)}</div>
                         </div>
                     </td>
                     <td>
@@ -203,20 +210,20 @@ function handleRemindLater(productId: number): void {
     `确定将「${product.name}」设置为3天后再次提醒吗？`,
     () => {
       // 记录操作
-      const now = new Date();
-      const remindTime = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const nowTimestamp = Math.floor(Date.now() / 1000);
+      const remindTimestamp = nowTimestamp + 3 * 24 * 60 * 60;
 
       operationLogs.push({
         productId: productId,
         productName: product.name,
         operationType: "3天后提醒",
-        operationTime: now.toISOString(),
-        remindTime: remindTime.toISOString(),
+        operationTime: new Date(nowTimestamp * 1000).toISOString(),
+        remindTime: new Date(remindTimestamp * 1000).toISOString(),
       });
 
       // 从当前列表移除（实际应设置下次提醒时间）
       product.status = "remind_later";
-      product.remindTime = remindTime.toISOString();
+      product.remindTime = remindTimestamp;
 
       // 重新渲染
       renderProducts();
@@ -238,17 +245,17 @@ function handleMarkNew(productId: number): void {
     `确定将「${product.name}」标记为已上新吗？此操作将记录上新时间并进入调货提醒流程。`,
     () => {
       // 记录上新时间
-      const now = new Date();
+      const nowTimestamp = Math.floor(Date.now() / 1000);
       product.status = "listed";
-      product.listedTime = now.toISOString();
+      product.listedTime = nowTimestamp;
 
       // 记录操作
       operationLogs.push({
         productId: productId,
         productName: product.name,
         operationType: "已上新",
-        operationTime: now.toISOString(),
-        listedTime: now.toISOString(),
+        operationTime: new Date(nowTimestamp * 1000).toISOString(),
+        listedTime: new Date(nowTimestamp * 1000).toISOString(),
       });
 
       completedThisWeek++;

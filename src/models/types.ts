@@ -8,11 +8,11 @@ export interface Product {
   barcode: string;
   code: string;
   costPrice: number;
-  createTime: string;
+  createTime: number; // 秒时间戳
   status: ProductStatus;
   image?: string;
-  listedTime?: string; // 上新时间
-  remindTime?: string; // 下次提醒时间
+  listedTime?: number; // 上新时间，秒时间戳
+  remindTime?: number; // 下次提醒时间，秒时间戳
 }
 
 // 操作日志接口

@@ -21,7 +21,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     barcode: '',
     code: '',
     costPrice: 0,
-    createTime: '',
+    createTime: 0,
     status: 'pending',
   };
 
@@ -34,10 +34,17 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
       case 'costPrice':
         product[productField] = Number(value) || 0;
         break;
+      case 'createTime':
+        // 字符串时间 "2026-04-25 13:59:45" 转换为秒时间戳
+        const dateStr = String(value);
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          product.createTime = Math.floor(date.getTime() / 1000);
+        }
+        break;
       case 'name':
       case 'barcode':
       case 'code':
-      case 'createTime':
         product[productField] = String(value);
         break;
     }
