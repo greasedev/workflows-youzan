@@ -12,7 +12,6 @@
 
 import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
-import { fetchAndParseXlsx } from "../libs/xlsx";
 import { getYesterdayRange } from "../libs/date";
 
 // Main workflow entry point
