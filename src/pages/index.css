@@ -126,14 +126,6 @@ tr:last-child td {
     border-bottom: none;
 }
 
-.product-img {
-    width: 60px;
-    height: 60px;
-    object-fit: cover;
-    border-radius: 6px;
-    border: 1px solid #eee;
-}
-
 .product-info {
     display: flex;
     align-items: center;
@@ -314,11 +306,6 @@ tr:last-child td {
 
     th, td {
         padding: 12px 8px;
-    }
-
-    .product-img {
-        width: 40px;
-        height: 40px;
     }
 
     .btn {

@@ -3,10 +3,8 @@ import type { Product } from '../models/types';
 
 // Excel 列名到 Product 字段的映射
 const COLUMN_MAPPING: Record<string, keyof Product> = {
-  '规格id': 'pid',
   '商品名称': 'name',
   '规格条码': 'barcode',
-  '规格编码': 'code',
   '零售价': 'costPrice',
   '创建时间': 'createTime',
 };
@@ -16,10 +14,8 @@ const COLUMN_MAPPING: Record<string, keyof Product> = {
  */
 function mapRowToProduct(row: Record<string, unknown>): Product {
   const product: Product = {
-    pid: 0,
     name: '',
     barcode: '',
-    code: '',
     costPrice: 0,
     createTime: 0,
     status: 'pending',
@@ -30,7 +26,6 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     if (value === undefined || value === null) continue;
 
     switch (productField) {
-      case 'pid':
       case 'costPrice':
         product[productField] = Number(value) || 0;
         break;
@@ -44,7 +39,6 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
         break;
       case 'name':
       case 'barcode':
-      case 'code':
         product[productField] = String(value);
         break;
     }

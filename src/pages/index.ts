@@ -6,6 +6,7 @@
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
 import { Product, DurationResult } from "../models/types";
 import { formatDate, formatOptionalDate } from "../libs/date";
+import { initDB } from "../libs/db";
 
 // 扩展 Window 类型以包含 agentOptions
 declare global {
@@ -16,10 +17,7 @@ declare global {
 
 // 创建 Agent 实例并初始化数据库
 const agent = new Agent(window.agentOptions || {});
-const db = agent.getDb();
-db.version(1).stores({
-  product: "++id, &pid, &barcode, &code, createTime, status, remindTime, listedTime",
-});
+const db = initDB(agent);
 
 type ProductListType = "new" | "transfer" | "return";
 
@@ -134,13 +132,8 @@ function renderTableHead(listType: ProductListType): void {
  * 渲染商品信息单元格
  */
 function renderProductInfo(product: Product): string {
-  const imageHtml = product.image
-    ? `<img class="product-img" src="${product.image}" alt="${product.name}" data-image="${product.image}" data-name="${product.name}">`
-    : "";
-
   return `
     <div class="product-info">
-      ${imageHtml}
       <div>
         <div class="product-name">${product.name}</div>
         <div class="product-barcode">条码: ${product.barcode}</div>
@@ -157,7 +150,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
     const listedDuration = product.listedTime ? getDuration(product.listedTime) : undefined;
 
     return `
-      <tr data-pid="${product.pid}">
+      <tr data-barcode="${product.barcode}">
         <td>${renderProductInfo(product)}</td>
         <td>${formatPrice(product.costPrice)}</td>
         <td>
@@ -172,7 +165,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
         </td>
         <td>
           <div class="actions">
-            <button class="btn btn-primary mark-returned-btn" data-pid="${product.pid}">回库</button>
+            <button class="btn btn-primary mark-returned-btn" data-pid="${product.barcode}">回库</button>
           </div>
         </td>
       </tr>
@@ -181,7 +174,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
 
   if (listType === "return") {
     return `
-      <tr data-pid="${product.pid}">
+      <tr data-barcode="${product.barcode}">
         <td>${renderProductInfo(product)}</td>
         <td>${formatPrice(product.costPrice)}</td>
         <td>
@@ -206,7 +199,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
   const duration = getDuration(product.createTime);
 
   return `
-    <tr data-pid="${product.pid}">
+    <tr data-barcode="${product.barcode}">
       <td>${renderProductInfo(product)}</td>
       <td>${formatPrice(product.costPrice)}</td>
       <td>
@@ -221,8 +214,8 @@ function renderProductRow(product: Product, listType: ProductListType): string {
       </td>
       <td>
         <div class="actions">
-          <button class="btn btn-secondary remind-btn" data-pid="${product.pid}">3天后提醒</button>
-          <button class="btn btn-primary mark-new-btn" data-pid="${product.pid}">上新</button>
+          <button class="btn btn-secondary remind-btn" data-barcode="${product.barcode}">3天后提醒</button>
+          <button class="btn btn-primary mark-new-btn" data-barcode="${product.barcode}">上新</button>
         </div>
       </td>
     </tr>
@@ -274,34 +267,27 @@ function bindProductEvents(): void {
   // 绑定"3天后提醒"按钮
   document.querySelectorAll(".remind-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
-      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
-      handleRemindLater(pid).catch(() => showToast("操作失败", "error"));
+      const barcode = (e.currentTarget as HTMLElement).dataset.barcode;
+      if (!barcode) return;
+      handleRemindLater(barcode).catch(() => showToast("操作失败", "error"));
     });
   });
 
   // 绑定"上新"按钮
   document.querySelectorAll(".mark-new-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
-      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
-      handleMarkNew(pid).catch(() => showToast("操作失败", "error"));
+      const barcode = (e.currentTarget as HTMLElement).dataset.barcode;
+      if (!barcode) return;
+      handleMarkNew(barcode).catch(() => showToast("操作失败", "error"));
     });
   });
 
   // 绑定"回库"按钮
   document.querySelectorAll(".mark-returned-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
-      const pid = Number((e.currentTarget as HTMLElement).dataset.pid);
-      handleMarkReturned(pid).catch(() => showToast("操作失败", "error"));
-    });
-  });
-
-  // 绑定图片点击事件
-  document.querySelectorAll(".product-img").forEach((img) => {
-    img.addEventListener("click", (e) => {
-      const target = e.currentTarget as HTMLElement;
-      const imageUrl = target.dataset.image || "";
-      const productName = target.dataset.name || "";
-      showImageModal(imageUrl, productName);
+      const barcode = (e.currentTarget as HTMLElement).dataset.barcode;
+      if (!barcode) return;
+      handleMarkReturned(barcode).catch(() => showToast("操作失败", "error"));
     });
   });
 }
@@ -321,8 +307,8 @@ function updateTabCounts(allProducts: Product[]): void {
 /**
  * 3天后提示
  */
-async function handleRemindLater(productId: number): Promise<void> {
-  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+async function handleRemindLater(barcode: string): Promise<void> {
+  const product = await db.table<Product>("product").where("barcode").equals(barcode).first();
   if (!product) {
     showToast("未找到商品", "error");
     return;
@@ -352,8 +338,8 @@ async function handleRemindLater(productId: number): Promise<void> {
 /**
  * 已上新
  */
-async function handleMarkNew(productId: number): Promise<void> {
-  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+async function handleMarkNew(barcode: string): Promise<void> {
+  const product = await db.table<Product>("product").where("barcode").equals(barcode).first();
   if (!product) {
     showToast("未找到商品", "error");
     return;
@@ -383,8 +369,8 @@ async function handleMarkNew(productId: number): Promise<void> {
 /**
  * 已回库
  */
-async function handleMarkReturned(productId: number): Promise<void> {
-  const product = await db.table<Product>("product").where("pid").equals(productId).first();
+async function handleMarkReturned(barcode: string): Promise<void> {
+  const product = await db.table<Product>("product").where("barcode").equals(barcode).first();
   if (!product) {
     showToast("未找到商品", "error");
     return;
@@ -406,13 +392,6 @@ async function handleMarkReturned(productId: number): Promise<void> {
       showToast(`已标记「${product.name}」为回库状态`, "success");
     },
   );
-}
-
-/**
- * 显示图片放大弹窗（简化版）
- */
-function showImageModal(imageUrl: string, productName: string): void {
-  showToast(`商品图片: ${productName}`, "success");
 }
 
 /**
@@ -526,7 +505,6 @@ const ProductApp = {
   handleRemindLater,
   handleMarkNew,
   handleMarkReturned,
-  showImageModal,
   getProducts,
 };
 

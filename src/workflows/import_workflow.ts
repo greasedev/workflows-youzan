@@ -13,17 +13,13 @@
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
 import { fetchAndParseXlsx } from "../libs/xlsx";
+import { initDB } from "../libs/db";
 
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
   const apis = createWorkflowApis(agent);
-  const db = agent.getDb();
-  db.version(1).stores({
-    report: "++id, &url",
-    product:
-      "++id, &pid, &barcode, &code, createTime, status, remindTime, listedTime",
-  });
+  const db = initDB(agent);
 
   console.log("Task:", context.task);
   console.log("Params:", context.params);
