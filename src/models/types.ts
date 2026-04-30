@@ -1,5 +1,5 @@
 // 商品状态枚举
-type ProductStatus = "pending" | "listed" | "transferred" | "returned";
+export type ProductStatus = "pending" | "listed" | "transferred" | "returned";
 
 // 商品数据接口
 export interface Product {
@@ -26,4 +26,25 @@ export interface DurationResult {
   weeks: number;
   text: string;
   isWarning: boolean;
+}
+
+export interface WeeklyStatsPeriod {
+  start: number;
+  end: number;
+  displayStart: string;
+  displayEnd: string;
+}
+
+export interface ReminderStats {
+  newlyEnteredCount: number;
+  completedCount: number;
+  postponedCount: number;
+  pendingCount: number;
+}
+
+export interface WeeklyStats {
+  period: WeeklyStatsPeriod;
+  listing: ReminderStats;
+  transfer: ReminderStats;
+  return: ReminderStats;
 }

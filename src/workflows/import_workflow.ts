@@ -14,6 +14,49 @@ import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
 import { fetchAndParseXlsx } from "../libs/xlsx";
 import { initDB } from "../libs/db";
+import type { Product } from "../models/types";
+
+async function upsertImportedProduct(db: any, product: Product): Promise<void> {
+  const existingProduct = await db
+    .table("product")
+    .where("barcode")
+    .equals(product.barcode)
+    .first();
+
+  if (existingProduct?.id != null) {
+    await db.table("product").update(existingProduct.id, {
+      name: product.name,
+      barcode: product.barcode,
+      costPrice: product.costPrice,
+    });
+    return;
+  }
+
+  try {
+    await db.table("product").add({
+      ...product,
+      status: "pending",
+      listingRemindCount: product.listingRemindCount ?? 0,
+      transferRemindCount: product.transferRemindCount ?? 0,
+      returnRemindCount: product.returnRemindCount ?? 0,
+    });
+  } catch (error) {
+    if (!(error instanceof Dexie.ConstraintError)) throw error;
+
+    const racedProduct = await db
+      .table("product")
+      .where("barcode")
+      .equals(product.barcode)
+      .first();
+    if (!racedProduct?.id) throw error;
+
+    await db.table("product").update(racedProduct.id, {
+      name: product.name,
+      barcode: product.barcode,
+      costPrice: product.costPrice,
+    });
+  }
+}
 
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {
@@ -37,11 +80,7 @@ export async function execute(context: WorkflowContext) {
         if (findUrl === undefined) {
           const products = await fetchAndParseXlsx(url);
           for (const product of products) {
-            try {
-              await db.table("product").add(product);
-            } catch (e) {
-              if (e instanceof Dexie.ConstraintError) continue;
-            }
+            await upsertImportedProduct(db, product);
           }
           await db.table("report").add({
             url: url,

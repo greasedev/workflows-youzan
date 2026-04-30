@@ -1,6 +1,5 @@
 import { Agent } from "@greaseclaw/workflow-sdk";
 
-
 export function initDB(agent: Agent) {
   const db = agent.getDb();
   db.version(1).stores({
