@@ -6,7 +6,7 @@ const COLUMN_MAPPING: Record<string, keyof Product> = {
   '商品名称': 'name',
   '规格条码': 'barcode',
   '零售价': 'costPrice',
-  '创建时间': 'createTime',
+  '创建时间': 'createdTime',
 };
 
 /**
@@ -17,7 +17,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     name: '',
     barcode: '',
     costPrice: 0,
-    createTime: 0,
+    createdTime: 0,
     status: 'pending',
   };
 
@@ -29,12 +29,12 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
       case 'costPrice':
         product[productField] = Number(value) || 0;
         break;
-      case 'createTime':
+      case 'createdTime':
         // 字符串时间 "2026-04-25 13:59:45" 转换为秒时间戳
         const dateStr = String(value);
         const date = new Date(dateStr);
         if (!isNaN(date.getTime())) {
-          product.createTime = Math.floor(date.getTime() / 1000);
+          product.createdTime = Math.floor(date.getTime() / 1000);
         }
         break;
       case 'name':

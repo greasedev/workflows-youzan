@@ -19,17 +19,17 @@ declare global {
 const agent = new Agent(window.agentOptions || {});
 const db = initDB(agent);
 
-type ProductListType = "new" | "transfer" | "return";
+type ProductListType = "listing" | "transfer" | "return";
 
-const LIST_TYPES: ProductListType[] = ["new", "transfer", "return"];
+const LIST_TYPES: ProductListType[] = ["listing", "transfer", "return"];
 
-let activeListType: ProductListType = "new";
+let activeListType: ProductListType = "listing";
 
 /**
  * 计算距离建档的时间
  */
-function getDuration(createTime: number): DurationResult {
-  const diffDays = Math.floor((Date.now() / 1000 - createTime) / 86400);
+function getDuration(createdTime: number): DurationResult {
+  const diffDays = Math.floor((Date.now() / 1000 - createdTime) / 86400);
   const weeks = Math.floor(diffDays / 7);
   const days = diffDays % 7;
 
@@ -70,14 +70,8 @@ function getDisplayProducts(
   // 过滤出 status 为 pending 的商品
   const pendingProducts = allProducts.filter((p) => p.status === "pending");
 
-  // 过滤出 remindTime 已到且 status 为 remind_later 的商品
-  const nowTimestamp = Math.floor(Date.now() / 1000);
-  const expiredRemindProducts = allProducts.filter(
-    (p) => p.status === "remind_later" && p.remindTime && p.remindTime <= nowTimestamp,
-  );
-
-  return [...pendingProducts, ...expiredRemindProducts].sort(
-    (a: Product, b: Product) => b.createTime - a.createTime,
+  return [...pendingProducts].sort(
+    (a: Product, b: Product) => b.createdTime - a.createdTime,
   );
 }
 
@@ -196,7 +190,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
     `;
   }
 
-  const duration = getDuration(product.createTime);
+  const duration = getDuration(product.createdTime);
 
   return `
     <tr data-barcode="${product.barcode}">
@@ -204,7 +198,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
       <td>${formatPrice(product.costPrice)}</td>
       <td>
         <div class="time-info">
-          <div class="create-time">${formatDate(product.createTime)}</div>
+          <div class="create-time">${formatDate(product.createdTime)}</div>
         </div>
       </td>
       <td>
@@ -215,7 +209,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
       <td>
         <div class="actions">
           <button class="btn btn-secondary remind-btn" data-barcode="${product.barcode}">3天后提醒</button>
-          <button class="btn btn-primary mark-new-btn" data-barcode="${product.barcode}">上新</button>
+          <button class="btn btn-primary mark-listed-btn" data-barcode="${product.barcode}">上新</button>
         </div>
       </td>
     </tr>
@@ -232,7 +226,7 @@ async function renderProducts(): Promise<void> {
   renderTableHead(activeListType);
 
   // 从数据库查询所有商品
-  const allProducts = await db.table<Product>("product").toArray();
+  const allProducts = await db.table<Product>("product").where("status").notEqual("returned").toArray();
   updateTabCounts(allProducts);
   const displayProducts = getDisplayProducts(allProducts, activeListType);
 
@@ -274,11 +268,11 @@ function bindProductEvents(): void {
   });
 
   // 绑定"上新"按钮
-  document.querySelectorAll(".mark-new-btn").forEach((btn) => {
+  document.querySelectorAll(".mark-listed-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const barcode = (e.currentTarget as HTMLElement).dataset.barcode;
       if (!barcode) return;
-      handleMarkNew(barcode).catch(() => showToast("操作失败", "error"));
+      handleMarkListed(barcode).catch(() => showToast("操作失败", "error"));
     });
   });
 
@@ -338,7 +332,7 @@ async function handleRemindLater(barcode: string): Promise<void> {
 /**
  * 已上新
  */
-async function handleMarkNew(barcode: string): Promise<void> {
+async function handleMarkListed(barcode: string): Promise<void> {
   const product = await db.table<Product>("product").where("barcode").equals(barcode).first();
   if (!product) {
     showToast("未找到商品", "error");
@@ -503,7 +497,7 @@ async function getProducts(): Promise<Product[]> {
 // 导出全局对象（供外部调用或调试）
 const ProductApp = {
   handleRemindLater,
-  handleMarkNew,
+  handleMarkListed,
   handleMarkReturned,
   getProducts,
 };
