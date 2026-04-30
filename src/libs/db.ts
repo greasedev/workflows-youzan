@@ -6,7 +6,7 @@ export function initDB(agent: Agent) {
   db.version(1).stores({
     report: "++id, &url",
     product:
-      "++id, &barcode, status, createdTime, listedTime, returnedTime, transferredTime",
+      "++id, &barcode, status, createdTime, listedTime, transferredTime, returnedTime, listingRemindTime, transferRemindTime, returnRemindTime",
   });
   return db;
 }
