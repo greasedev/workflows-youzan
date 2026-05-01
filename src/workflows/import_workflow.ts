@@ -178,6 +178,8 @@ export async function execute(context: WorkflowContext) {
     );
 
     const stockReportResult = await apis.get_stock_report();
+    // Clear existing stock data
+    db.table("stock").clear();
     const stockStats = await importReportRows(
       db,
       "stock",
