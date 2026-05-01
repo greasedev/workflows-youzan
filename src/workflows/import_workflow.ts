@@ -142,8 +142,7 @@ async function importReportRows<T>(
       continue;
     }
 
-    // Some imports, such as stock snapshots, need one-time preparation only
-    // after we know there is at least one new report to import.
+    // 库存等全量快照导入，需要在确认存在新报表后再执行一次性准备工作。
     if (!hasImportedAnyReport) {
       await beforeImport?.();
       hasImportedAnyReport = true;
@@ -194,7 +193,7 @@ export async function execute(context: WorkflowContext) {
       fetchAndParseStockXlsx,
       upsertImportedStock,
       async () => {
-        // Stock reports are full snapshots. Keep old stock when there is no new stock report.
+        // 库存报表是全量快照；没有新库存报表时保留旧库存。
         await db.table("stock").clear();
       },
     );
