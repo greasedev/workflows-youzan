@@ -119,6 +119,7 @@ async function importReportRows<T>(
   result: ExecutionResult,
   parseXlsx: XlsxParser<T>,
   upsertRow: RowUpserter<T>,
+  beforeImport?: () => Promise<void>,
 ): Promise<ImportStats> {
   const stats: ImportStats = {
     reportType,
@@ -126,6 +127,7 @@ async function importReportRows<T>(
     skippedReports: 0,
     importedRows: 0,
   };
+  let hasImportedAnyReport = false;
 
   for (const url of parseReportUrls(result)) {
     const existingReport = await db
@@ -138,6 +140,13 @@ async function importReportRows<T>(
       stats.skippedReports += 1;
       console.log(`${reportType} report ${url} already exists`);
       continue;
+    }
+
+    // Some imports, such as stock snapshots, need one-time preparation only
+    // after we know there is at least one new report to import.
+    if (!hasImportedAnyReport) {
+      await beforeImport?.();
+      hasImportedAnyReport = true;
     }
 
     const rows = await parseXlsx(url);
@@ -178,14 +187,16 @@ export async function execute(context: WorkflowContext) {
     );
 
     const stockReportResult = await apis.get_stock_report();
-    // Clear existing stock data
-    await db.table("stock").clear();
     const stockStats = await importReportRows(
       db,
       "stock",
       stockReportResult,
       fetchAndParseStockXlsx,
       upsertImportedStock,
+      async () => {
+        // Stock reports are full snapshots. Keep old stock when there is no new stock report.
+        await db.table("stock").clear();
+      },
     );
 
     return {
