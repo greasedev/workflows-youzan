@@ -2,21 +2,24 @@ import * as XLSX from "xlsx";
 import type { Product, Stock } from "../models/types";
 import { getCurrentTimestamp } from "../libs/reminders";
 
-type XlsxRowMapper<T extends Product | Stock> = (row: Record<string, unknown>) => T;
+type XlsxRowMapper<T extends Product | Stock> = (
+  row: Record<string, unknown>,
+) => T;
+type XlsxRowFilter<T extends Product | Stock> = (row: T) => boolean;
 
 // Excel 列名到 Product 字段的映射
 const PRODUCT_COLUMN_MAPPING: Record<string, keyof Product> = {
-  "商品名称": "name",
-  "规格条码": "barcode",
-  "零售价": "costPrice",
-  "创建时间": "createdTime",
+  商品名称: "name",
+  规格条码: "barcode",
+  零售价: "costPrice",
+  创建时间: "createdTime",
 };
 
 // Excel 列名到 Stock 字段的映射
 const STOCK_COLUMN_MAPPING: Record<string, keyof Stock> = {
   "商品/规格条码": "barcode",
   "门店/仓库": "store",
-  "实物库存": "stock",
+  实物库存: "stock",
 };
 
 const EXCEL_EPOCH_OFFSET_DAYS = 25569;
@@ -50,7 +53,9 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     returnRemindCount: 0,
   };
 
-  for (const [excelColumn, productField] of Object.entries(PRODUCT_COLUMN_MAPPING)) {
+  for (const [excelColumn, productField] of Object.entries(
+    PRODUCT_COLUMN_MAPPING,
+  )) {
     const value = row[excelColumn];
     if (value === undefined || value === null) continue;
 
@@ -82,7 +87,9 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
     lastUpdatedTime: getCurrentTimestamp(),
   };
 
-  for (const [excelColumn, stockField] of Object.entries(STOCK_COLUMN_MAPPING)) {
+  for (const [excelColumn, stockField] of Object.entries(
+    STOCK_COLUMN_MAPPING,
+  )) {
     const value = row[excelColumn];
     if (value === undefined || value === null) continue;
 
@@ -113,11 +120,14 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
 async function fetchAndParseXlsx<T extends Product | Stock>(
   url: string,
   mapRow: XlsxRowMapper<T>,
+  filterRow: XlsxRowFilter<T>,
   sheetName?: string,
 ): Promise<T[]> {
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to fetch xlsx: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch xlsx: ${response.status} ${response.statusText}`,
+    );
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -131,19 +141,29 @@ async function fetchAndParseXlsx<T extends Product | Stock>(
   }
 
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-  return rawRows.map(mapRow).filter((row) => row.barcode);
+  return rawRows.map(mapRow).filter(filterRow);
 }
 
 export async function fetchAndParseProductXlsx(
   url: string,
   sheetName?: string,
 ): Promise<Product[]> {
-  return fetchAndParseXlsx(url, mapRowToProduct, sheetName);
+  return fetchAndParseXlsx(
+    url,
+    mapRowToProduct,
+    (product) => Boolean(product.barcode),
+    sheetName,
+  );
 }
 
 export async function fetchAndParseStockXlsx(
   url: string,
   sheetName?: string,
 ): Promise<Stock[]> {
-  return fetchAndParseXlsx(url, mapRowToStock, sheetName);
+  return fetchAndParseXlsx(
+    url,
+    mapRowToStock,
+    (stock) => Boolean(stock.barcode) && stock.stock > 0,
+    sheetName,
+  );
 }
