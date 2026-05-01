@@ -11,10 +11,22 @@
  */
 
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
-import { createWorkflowApis } from "../api";
-import { fetchAndParseProductXlsx } from "../libs/xlsx";
+import { createWorkflowApis, type ExecutionResult } from "../api";
+import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
 import { initDB } from "../libs/db";
-import type { Product } from "../models/types";
+import type { Product, Stock } from "../models/types";
+
+type ReportType = "product" | "stock";
+
+interface ImportStats {
+  reportType: ReportType;
+  importedReports: number;
+  skippedReports: number;
+  importedRows: number;
+}
+
+type XlsxParser<T> = (url: string) => Promise<T[]>;
+type RowUpserter<T> = (db: any, row: T) => Promise<void>;
 
 async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   const existingProduct = await db
@@ -58,6 +70,93 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   }
 }
 
+async function upsertImportedStock(db: any, stock: Stock): Promise<void> {
+  const existingStock = await db
+    .table("stock")
+    .where("[barcode+store]")
+    .equals([stock.barcode, stock.store])
+    .first();
+
+  if (existingStock?.id != null) {
+    await db.table("stock").update(existingStock.id, {
+      stock: stock.stock,
+      lastUpdatedTime: stock.lastUpdatedTime,
+    });
+    return;
+  }
+
+  try {
+    await db.table("stock").add(stock);
+  } catch (error) {
+    if (!(error instanceof Dexie.ConstraintError)) throw error;
+
+    const racedStock = await db
+      .table("stock")
+      .where("[barcode+store]")
+      .equals([stock.barcode, stock.store])
+      .first();
+    if (!racedStock?.id) throw error;
+
+    await db.table("stock").update(racedStock.id, {
+      stock: stock.stock,
+      lastUpdatedTime: stock.lastUpdatedTime,
+    });
+  }
+}
+
+function parseReportUrls(result: ExecutionResult): string[] {
+  if (!result.success || !result.task) return [];
+
+  const rawReportList = JSON.parse(result.task.extract_data || "[]") as unknown[];
+  return rawReportList
+    .map((item) => String(item).trim())
+    .filter((url) => url.length > 0);
+}
+
+async function importReportRows<T>(
+  db: any,
+  reportType: ReportType,
+  result: ExecutionResult,
+  parseXlsx: XlsxParser<T>,
+  upsertRow: RowUpserter<T>,
+): Promise<ImportStats> {
+  const stats: ImportStats = {
+    reportType,
+    importedReports: 0,
+    skippedReports: 0,
+    importedRows: 0,
+  };
+
+  for (const url of parseReportUrls(result)) {
+    const existingReport = await db
+      .table("report")
+      .where("[type+url]")
+      .equals([reportType, url])
+      .first();
+
+    if (existingReport !== undefined) {
+      stats.skippedReports += 1;
+      console.log(`${reportType} report ${url} already exists`);
+      continue;
+    }
+
+    const rows = await parseXlsx(url);
+    for (const row of rows) {
+      await upsertRow(db, row);
+      stats.importedRows += 1;
+    }
+
+    await db.table("report").add({
+      type: reportType,
+      url,
+      timestamp: Math.floor(Date.now() / 1000),
+    });
+    stats.importedReports += 1;
+  }
+
+  return stats;
+}
+
 // Main workflow entry point
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
@@ -69,28 +168,32 @@ export async function execute(context: WorkflowContext) {
   console.log("Executing workflow...");
 
   try {
-    const result = await apis.get_goods_report();
-    if (result.success && result.task) {
-      const report_list = JSON.parse(result.task.extract_data || "[]");
-      for (const item of report_list) {
-        const url = item.trim();
-        const findUrl = await db.table("report").get({
-          url: url,
-        });
-        if (findUrl === undefined) {
-          const products = await fetchAndParseProductXlsx(url);
-          for (const product of products) {
-            await upsertImportedProduct(db, product);
-          }
-          await db.table("report").add({
-            url: url,
-            timestamp: Math.floor(Date.now() / 1000),
-          });
-        } else {
-          console.log(`Report ${url} already exists`);
-        }
-      }
-    }
+    const goodsReportResult = await apis.get_goods_report();
+    const productStats = await importReportRows(
+      db,
+      "product",
+      goodsReportResult,
+      fetchAndParseProductXlsx,
+      upsertImportedProduct,
+    );
+
+    const stockReportResult = await apis.get_stock_report();
+    const stockStats = await importReportRows(
+      db,
+      "stock",
+      stockReportResult,
+      fetchAndParseStockXlsx,
+      upsertImportedStock,
+    );
+
+    return {
+      success: true,
+      message: "Workflow completed successfully",
+      data: {
+        product: productStats,
+        stock: stockStats,
+      },
+    };
   } catch (error) {
     console.error("Workflow error:", error);
     return {
@@ -99,11 +202,6 @@ export async function execute(context: WorkflowContext) {
       error: error,
     };
   }
-
-  return {
-    success: true,
-    message: "Workflow completed successfully",
-  };
 }
 // @ts-ignore
 globalThis.execute = execute;
