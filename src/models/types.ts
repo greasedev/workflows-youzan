@@ -20,6 +20,15 @@ export interface Product {
   returnRemindCount?: number; // 回库提醒次数，默认 0 次
 }
 
+// 库存数据接口
+export interface Stock {
+  id?: number; // 数据库自增主键（可选，仅在数据库记录中存在）
+  barcode: string; // 商品规格条码
+  store: string; // 库存门店
+  stock: number; // 库存数量
+  lastUpdatedTime: number; // 最后更新时间，秒时间戳
+}
+
 // 时间计算结果接口
 export interface DurationResult {
   days: number;

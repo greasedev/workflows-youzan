@@ -1,12 +1,22 @@
 import * as XLSX from "xlsx";
-import type { Product } from "../models/types";
+import type { Product, Stock } from "../models/types";
+import { getCurrentTimestamp } from "../libs/reminders";
+
+
 
 // Excel 列名到 Product 字段的映射
-const COLUMN_MAPPING: Record<string, keyof Product> = {
-  商品名称: "name",
-  规格条码: "barcode",
-  零售价: "costPrice",
-  创建时间: "createdTime",
+const PRODUCT_COLUMN_MAPPING: Record<string, keyof Product> = {
+  "商品名称": "name",
+  "规格条码": "barcode",
+  "零售价": "costPrice",
+  "创建时间": "createdTime",
+};
+
+// Excel 列名到 Stock 字段的映射
+const STOCK_COLUMN_MAPPING: Record<string, keyof Stock> = {
+  "商品/规格条码": "barcode",
+  "门店/仓库": "store",
+  "实物库存": "stock",
 };
 
 const EXCEL_EPOCH_OFFSET_DAYS = 25569;
@@ -40,7 +50,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
     returnRemindCount: 0,
   };
 
-  for (const [excelColumn, productField] of Object.entries(COLUMN_MAPPING)) {
+  for (const [excelColumn, productField] of Object.entries(PRODUCT_COLUMN_MAPPING)) {
     const value = row[excelColumn];
     if (value === undefined || value === null) continue;
 
@@ -59,6 +69,37 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
   }
 
   return product;
+}
+
+/**
+ * Map raw row data to Stock structure
+ */
+function mapRowToStock(row: Record<string, unknown>): Stock {
+  const stock: Stock = {
+    barcode: "",
+    store: "",
+    stock: 0,
+    lastUpdatedTime: getCurrentTimestamp(),
+  };
+
+  for (const [excelColumn, stockField] of Object.entries(STOCK_COLUMN_MAPPING)) {
+    const value = row[excelColumn];
+    if (value === undefined || value === null) continue;
+
+    switch (stockField) {
+      case "stock":
+        stock[stockField] = Number(value) || 0;
+        break;
+      case "lastUpdatedTime":
+        stock.lastUpdatedTime = parseCreatedTime(value);
+        break;
+      case "barcode":
+        stock[stockField] = String(value).trim();
+        break;
+    }
+  }
+
+  return stock;
 }
 
 /**
