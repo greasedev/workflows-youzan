@@ -31,7 +31,9 @@ export interface ExecutionResult {
  */
 export interface WorkflowApis {
   export_goods: (start_time: string, end_time: string) => Promise<ExecutionResult>;
-  get_report_list: () => Promise<ExecutionResult>;
+  get_goods_report: () => Promise<ExecutionResult>;
+  export_stock: () => Promise<ExecutionResult>;
+  get_stock_report: () => Promise<ExecutionResult>;
 }
 
 
@@ -54,12 +56,36 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
   },
 
   /**
-   * Get report list
+   * Get goods report
    * 获取导出文件列表，获取导出文件列表，获取导出文件列表
-   * @endpoint /v1/custom/https-store-youzan-com-get-report-list-38unjm
+   * @endpoint /v1/custom/https-store-youzan-com-get-goods-report-38unjm
    */
-  async get_report_list(): Promise<ExecutionResult> {
-    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-get-report-list-38unjm', {
+  async get_goods_report(): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-get-goods-report-38unjm', {
+      method: 'POST',
+    });
+    return data;
+  },
+
+  /**
+   * Export stock
+   * 获取商品库存分布，获取商品库存分布，获取商品库存分布
+   * @endpoint /v1/custom/https-store-youzan-com-export-stock-k7is4d
+   */
+  async export_stock(): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-export-stock-k7is4d', {
+      method: 'POST',
+    });
+    return data;
+  },
+
+  /**
+   * Get stock report
+   * 导出库存数据，导出库存数据，导出库存数据
+   * @endpoint /v1/custom/store-youzan-com-get-stock-report-lc82o7
+   */
+  async get_stock_report(): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-get-stock-report-lc82o7', {
       method: 'POST',
     });
     return data;

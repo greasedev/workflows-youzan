@@ -69,7 +69,7 @@ export async function execute(context: WorkflowContext) {
   console.log("Executing workflow...");
 
   try {
-    const result = await apis.get_report_list();
+    const result = await apis.get_goods_report();
     if (result.success && result.task) {
       const report_list = JSON.parse(result.task.extract_data || "[]");
       for (const item of report_list) {
