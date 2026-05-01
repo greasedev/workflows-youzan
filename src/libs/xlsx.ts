@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import type { Product, Stock } from "../models/types";
 import { getCurrentTimestamp } from "../libs/reminders";
 
-
+type XlsxRowMapper<T extends Product | Stock> = (row: Record<string, unknown>) => T;
 
 // Excel 列名到 Product 字段的映射
 const PRODUCT_COLUMN_MAPPING: Record<string, keyof Product> = {
@@ -94,6 +94,7 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
         stock.lastUpdatedTime = parseCreatedTime(value);
         break;
       case "barcode":
+      case "store":
         stock[stockField] = String(value).trim();
         break;
     }
@@ -103,12 +104,17 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
 }
 
 /**
- * Fetch xlsx file from URL and parse to Product array
+ * Fetch xlsx file from URL and parse to a mapped row array
  * @param url - URL of the xlsx file
+ * @param mapRow - Row mapper, e.g. mapRowToProduct or mapRowToStock
  * @param sheetName - Optional sheet name to read (defaults to first sheet)
- * @returns Array of Product objects
+ * @returns Array of mapped row objects
  */
-export async function fetchAndParseXlsx(url: string, sheetName?: string): Promise<Product[]> {
+async function fetchAndParseXlsx<T extends Product | Stock>(
+  url: string,
+  mapRow: XlsxRowMapper<T>,
+  sheetName?: string,
+): Promise<T[]> {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch xlsx: ${response.status} ${response.statusText}`);
@@ -125,5 +131,19 @@ export async function fetchAndParseXlsx(url: string, sheetName?: string): Promis
   }
 
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet);
-  return rawRows.map(mapRowToProduct).filter((product) => product.barcode);
+  return rawRows.map(mapRow).filter((row) => row.barcode);
+}
+
+export async function fetchAndParseProductXlsx(
+  url: string,
+  sheetName?: string,
+): Promise<Product[]> {
+  return fetchAndParseXlsx(url, mapRowToProduct, sheetName);
+}
+
+export async function fetchAndParseStockXlsx(
+  url: string,
+  sheetName?: string,
+): Promise<Stock[]> {
+  return fetchAndParseXlsx(url, mapRowToStock, sheetName);
 }

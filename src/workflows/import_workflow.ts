@@ -12,7 +12,7 @@
 
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
-import { fetchAndParseXlsx } from "../libs/xlsx";
+import { fetchAndParseProductXlsx } from "../libs/xlsx";
 import { initDB } from "../libs/db";
 import type { Product } from "../models/types";
 
@@ -78,7 +78,7 @@ export async function execute(context: WorkflowContext) {
           url: url,
         });
         if (findUrl === undefined) {
-          const products = await fetchAndParseXlsx(url);
+          const products = await fetchAndParseProductXlsx(url);
           for (const product of products) {
             await upsertImportedProduct(db, product);
           }
