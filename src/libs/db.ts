@@ -6,7 +6,7 @@ export function initDB(agent: Agent) {
     report: "++id, &url",
     product:
       "++id, &barcode, status, createdTime, listedTime, transferredTime, returnedTime, listingRemindTime, transferRemindTime, returnRemindTime",
-    stock: "++id, &barcode, stock",
+    stock: "++id, barcode, store",
   });
   return db;
 }
