@@ -4,7 +4,7 @@
  */
 
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
-import { Product, DurationResult } from "../models/types";
+import { Product, DurationResult, Stock } from "../models/types";
 import { formatDate, formatOptionalDate } from "../libs/date";
 import { initDB } from "../libs/db";
 import {
@@ -140,7 +140,7 @@ function renderTableHead(listType: ProductListType): void {
       <th style="width: 240px;">商品信息</th>
       <th style="width: 110px;">零售价</th>
       <th style="width: 180px;">上新时间</th>
-      <th style="width: 110px;">上新时长</th>
+      <th style="width: 150px;">门店库存</th>
       <th style="width: 220px;">操作</th>
     `;
     return;
@@ -186,11 +186,55 @@ function renderActionButton(
   return `<button class="btn btn-${variant} action-btn" type="button" data-action="${action}" data-barcode="${escapeAttribute(barcode)}">${text}</button>`;
 }
 
-function renderProductRow(product: Product, listType: ProductListType): string {
+function renderStoreStock(stocks: Stock[] | undefined): string {
+  if (!stocks || stocks.length === 0) return `<span class="empty-value">-</span>`;
+
+  const stockRows = stocks
+    .map(
+      (stock) => `
+        <div class="stock-line">
+          <span class="stock-store">${escapeHtml(stock.store)}</span>
+          <span class="stock-count">${stock.stock}</span>
+        </div>
+      `,
+    )
+    .join("");
+
+  return `<div class="stock-list">${stockRows}</div>`;
+}
+
+async function getStocksByBarcodeForProducts(products: Product[]): Promise<Map<string, Stock[]>> {
+  const uniqueBarcodes = [...new Set(products.map((product) => product.barcode).filter(Boolean))];
+  const stocksByBarcode = new Map<string, Stock[]>();
+  if (uniqueBarcodes.length === 0) return stocksByBarcode;
+
+  const stocks = (await db
+    .table("stock")
+    .where("barcode")
+    .anyOf(uniqueBarcodes)
+    .toArray()) as Stock[];
+
+  stocks.forEach((stock) => {
+    const barcodeStocks = stocksByBarcode.get(stock.barcode) ?? [];
+    barcodeStocks.push(stock);
+    stocksByBarcode.set(stock.barcode, barcodeStocks);
+  });
+
+  stocksByBarcode.forEach((barcodeStocks) => {
+    barcodeStocks.sort((a, b) => a.store.localeCompare(b.store, "zh-CN"));
+  });
+
+  return stocksByBarcode;
+}
+
+function renderProductRow(
+  product: Product,
+  listType: ProductListType,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
   const barcode = product.barcode;
 
   if (listType === "transfer") {
-    const listedDuration = product.listedTime ? getDuration(product.listedTime) : undefined;
     const actionButtons = [
       renderActionButton("mark-transferred", barcode, "调货", "primary"),
       normalizeCount(product.transferRemindCount) < MAX_TRANSFER_POSTPONE_COUNT
@@ -208,9 +252,7 @@ function renderProductRow(product: Product, listType: ProductListType): string {
           </div>
         </td>
         <td>
-          <div class="time-info">
-            <div class="duration ${listedDuration?.isWarning ? "warning" : ""}">${listedDuration?.text || "-"}</div>
-          </div>
+          ${renderStoreStock(stocksByBarcode?.get(barcode))}
         </td>
         <td><div class="actions">${actionButtons}</div></td>
       </tr>
@@ -280,6 +322,10 @@ async function renderProducts(): Promise<void> {
   const allProducts = (await db.table("product").toArray()) as Product[];
   updateTabCounts(allProducts, now);
   const displayProducts = getDisplayProducts(allProducts, activeListType, now);
+  const stocksByBarcode =
+    activeListType === "transfer"
+      ? await getStocksByBarcodeForProducts(displayProducts)
+      : undefined;
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
@@ -298,7 +344,7 @@ async function renderProducts(): Promise<void> {
   }
 
   tbody.innerHTML = displayProducts
-    .map((product: Product) => renderProductRow(product, activeListType))
+    .map((product: Product) => renderProductRow(product, activeListType, stocksByBarcode))
     .join("");
   bindProductEvents();
 }

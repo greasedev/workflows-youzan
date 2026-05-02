@@ -164,6 +164,36 @@ tr:last-child td {
     font-weight: 500;
 }
 
+.stock-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: #555;
+}
+
+.stock-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    max-width: 180px;
+}
+
+.stock-store {
+    color: #666;
+    overflow-wrap: anywhere;
+}
+
+.stock-count {
+    color: #333;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.empty-value {
+    color: #aaa;
+}
+
 .actions {
     display: flex;
     flex-wrap: wrap;
