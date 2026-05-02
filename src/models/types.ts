@@ -57,3 +57,17 @@ export interface WeeklyStats {
   transfer: ReminderStats;
   return: ReminderStats;
 }
+
+export type ReminderTimeUnit = "day" | "week";
+
+export interface ReminderSettings {
+  id: string;
+  listingReminderDays: number;
+  listingReminderUnit: ReminderTimeUnit;
+  transferReminderDays: number;
+  transferReminderUnit: ReminderTimeUnit;
+  returnReminderDays: number;
+  returnReminderUnit: ReminderTimeUnit;
+  maxTransferPostponeCount: number;
+  maxReturnPostponeCount: number;
+}

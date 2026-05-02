@@ -12,6 +12,7 @@
 
 import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { DB_TABLES, initDB } from "../libs/db";
+import { loadReminderSettings } from "../libs/settings";
 import { calculateWeeklyStats, getPreviousWeekPeriod } from "../libs/weekly_stats";
 import type { Product } from "../models/types";
 
@@ -25,7 +26,8 @@ export async function execute(context: WorkflowContext) {
 
   try {
     const products = (await db.table(DB_TABLES.product).toArray()) as Product[];
-    const stats = calculateWeeklyStats(products, getPreviousWeekPeriod());
+    const settings = await loadReminderSettings(db);
+    const stats = calculateWeeklyStats(products, getPreviousWeekPeriod(), settings);
 
     return {
       success: true,

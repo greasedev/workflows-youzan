@@ -1,16 +1,23 @@
-import type { Product, ReminderStats, WeeklyStats, WeeklyStatsPeriod } from "../models/types";
+import type {
+  Product,
+  ReminderSettings,
+  ReminderStats,
+  WeeklyStats,
+  WeeklyStatsPeriod,
+} from "../models/types";
 import { formatDate } from "./date";
 import {
+  getListingThresholdSeconds,
+  getReturnThresholdSeconds,
+  getTransferThresholdSeconds,
   isInListingReminder,
   isInReturnReminder,
   isInTransferReminder,
   LISTING_POSTPONE_SECONDS,
-  LISTING_THRESHOLD_SECONDS,
   RETURN_POSTPONE_SECONDS,
-  RETURN_THRESHOLD_SECONDS,
   TRANSFER_POSTPONE_SECONDS,
-  TRANSFER_THRESHOLD_SECONDS,
 } from "./reminders";
+import { DEFAULT_REMINDER_SETTINGS } from "./settings";
 
 function toTimestamp(date: Date): number {
   return Math.floor(date.getTime() / 1000);
@@ -97,6 +104,7 @@ function buildReminderStats(params: {
 export function calculateWeeklyStats(
   products: Product[],
   period = getPreviousWeekPeriod(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): WeeklyStats {
   return {
     period,
@@ -104,31 +112,31 @@ export function calculateWeeklyStats(
       products,
       period,
       entryBaseField: "createdTime",
-      entryOffsetSeconds: LISTING_THRESHOLD_SECONDS,
+      entryOffsetSeconds: getListingThresholdSeconds(settings),
       completedField: "listedTime",
       postponedField: "listingRemindTime",
       postponeOffsetSeconds: LISTING_POSTPONE_SECONDS,
-      pendingPredicate: isInListingReminder,
+      pendingPredicate: (product, now) => isInListingReminder(product, now, settings),
     }),
     transfer: buildReminderStats({
       products,
       period,
       entryBaseField: "listedTime",
-      entryOffsetSeconds: TRANSFER_THRESHOLD_SECONDS,
+      entryOffsetSeconds: getTransferThresholdSeconds(settings),
       completedField: "transferredTime",
       postponedField: "transferRemindTime",
       postponeOffsetSeconds: TRANSFER_POSTPONE_SECONDS,
-      pendingPredicate: isInTransferReminder,
+      pendingPredicate: (product, now) => isInTransferReminder(product, now, settings),
     }),
     return: buildReminderStats({
       products,
       period,
       entryBaseField: "listedTime",
-      entryOffsetSeconds: RETURN_THRESHOLD_SECONDS,
+      entryOffsetSeconds: getReturnThresholdSeconds(settings),
       completedField: "returnedTime",
       postponedField: "returnRemindTime",
       postponeOffsetSeconds: RETURN_POSTPONE_SECONDS,
-      pendingPredicate: isInReturnReminder,
+      pendingPredicate: (product, now) => isInReturnReminder(product, now, settings),
     }),
   };
 }

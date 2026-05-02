@@ -13,18 +13,23 @@
             <p>AI Agent 商品全流程跟踪系统</p>
         </div>
 
-        <div class="list-tabs" role="tablist" aria-label="提醒列表切换">
-            <button class="tab-btn active" type="button" data-list-type="listing" role="tab" aria-selected="true">
-                <span>上新提醒</span>
-                <span class="tab-count" data-count-type="listing">0</span>
-            </button>
-            <button class="tab-btn" type="button" data-list-type="transfer" role="tab" aria-selected="false">
-                <span>调货提醒</span>
-                <span class="tab-count" data-count-type="transfer">0</span>
-            </button>
-            <button class="tab-btn" type="button" data-list-type="return" role="tab" aria-selected="false">
-                <span>回库提醒</span>
-                <span class="tab-count" data-count-type="return">0</span>
+        <div class="list-toolbar">
+            <div class="list-tabs" role="tablist" aria-label="提醒列表切换">
+                <button class="tab-btn active" type="button" data-list-type="listing" role="tab" aria-selected="true">
+                    <span>上新提醒</span>
+                    <span class="tab-count" data-count-type="listing">0</span>
+                </button>
+                <button class="tab-btn" type="button" data-list-type="transfer" role="tab" aria-selected="false">
+                    <span>调货提醒</span>
+                    <span class="tab-count" data-count-type="transfer">0</span>
+                </button>
+                <button class="tab-btn" type="button" data-list-type="return" role="tab" aria-selected="false">
+                    <span>回库提醒</span>
+                    <span class="tab-count" data-count-type="return">0</span>
+                </button>
+            </div>
+            <button class="btn btn-secondary settings-entry-btn" id="settings-entry-btn" type="button">
+                参数设置
             </button>
         </div>
 
@@ -55,6 +60,57 @@
                 <button class="btn btn-secondary" id="modal-cancel-btn">取消</button>
                 <button class="btn btn-primary" id="modal-confirm-btn">确认</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 参数设置弹窗 -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-title">参数设置</div>
+            <form class="settings-form" id="settings-form">
+                <div class="settings-row">
+                    <label class="settings-label" for="listing-reminder-value">上新提醒时间</label>
+                    <div class="settings-control">
+                        <input class="settings-input" id="listing-reminder-value" name="listingReminderValue" type="number" min="1" step="1" required>
+                        <select class="settings-select" id="listing-reminder-unit" name="listingReminderUnit">
+                            <option value="day">天</option>
+                            <option value="week">周</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="transfer-reminder-value">调货提醒时间</label>
+                    <div class="settings-control">
+                        <input class="settings-input" id="transfer-reminder-value" name="transferReminderValue" type="number" min="1" step="1" required>
+                        <select class="settings-select" id="transfer-reminder-unit" name="transferReminderUnit">
+                            <option value="day">天</option>
+                            <option value="week">周</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="return-reminder-value">回库提醒时间</label>
+                    <div class="settings-control">
+                        <input class="settings-input" id="return-reminder-value" name="returnReminderValue" type="number" min="1" step="1" required>
+                        <select class="settings-select" id="return-reminder-unit" name="returnReminderUnit">
+                            <option value="day">天</option>
+                            <option value="week">周</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="transfer-postpone-count">调货提醒最大推后次数</label>
+                    <input class="settings-input settings-count-input" id="transfer-postpone-count" name="transferPostponeCount" type="number" min="0" step="1" required>
+                </div>
+                <div class="settings-row">
+                    <label class="settings-label" for="return-postpone-count">回库提醒最大推后次数</label>
+                    <input class="settings-input settings-count-input" id="return-postpone-count" name="returnPostponeCount" type="number" min="0" step="1" required>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="settings-cancel-btn" type="button">取消</button>
+                    <button class="btn btn-primary" id="settings-save-btn" type="submit">保存</button>
+                </div>
+            </form>
         </div>
     </div>
 

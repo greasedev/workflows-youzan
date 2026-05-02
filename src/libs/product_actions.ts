@@ -1,4 +1,4 @@
-import type { Product } from "../models/types";
+import type { Product, ReminderSettings } from "../models/types";
 import { DB_TABLES } from "./db";
 import {
   getCurrentTimestamp,
@@ -6,12 +6,11 @@ import {
   isInReturnReminder,
   isInTransferReminder,
   LISTING_POSTPONE_SECONDS,
-  MAX_RETURN_POSTPONE_COUNT,
-  MAX_TRANSFER_POSTPONE_COUNT,
   normalizeCount,
   RETURN_POSTPONE_SECONDS,
   TRANSFER_POSTPONE_SECONDS,
 } from "./reminders";
+import { DEFAULT_REMINDER_SETTINGS } from "./settings";
 
 type ProductDb = any;
 
@@ -41,6 +40,7 @@ export async function markListed(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -49,7 +49,7 @@ export async function markListed(
     if (product.status !== "pending") {
       throw new ProductActionError("只有待上新商品可以执行上新");
     }
-    if (!isInListingReminder(product, now)) {
+    if (!isInListingReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入上新提醒列表");
     }
 
@@ -67,6 +67,7 @@ export async function postponeListingReminder(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -75,7 +76,7 @@ export async function postponeListingReminder(
     if (product.status !== "pending") {
       throw new ProductActionError("只有待上新商品可以推后上新提醒");
     }
-    if (!isInListingReminder(product, now)) {
+    if (!isInListingReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入上新提醒列表");
     }
 
@@ -95,6 +96,7 @@ export async function markTransferred(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -103,7 +105,7 @@ export async function markTransferred(
     if (product.status !== "listed") {
       throw new ProductActionError("只有已上新商品可以执行调货");
     }
-    if (!isInTransferReminder(product, now)) {
+    if (!isInTransferReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入调货提醒列表");
     }
 
@@ -121,6 +123,7 @@ export async function postponeTransferReminder(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -129,13 +132,13 @@ export async function postponeTransferReminder(
     if (product.status !== "listed") {
       throw new ProductActionError("只有已上新商品可以推后调货提醒");
     }
-    if (!isInTransferReminder(product, now)) {
+    if (!isInTransferReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入调货提醒列表");
     }
 
     const transferRemindCount = normalizeCount(product.transferRemindCount);
-    if (transferRemindCount >= MAX_TRANSFER_POSTPONE_COUNT) {
-      throw new ProductActionError("调货提醒最多只能推后 2 次");
+    if (transferRemindCount >= settings.maxTransferPostponeCount) {
+      throw new ProductActionError(`调货提醒最多只能推后 ${settings.maxTransferPostponeCount} 次`);
     }
 
     const nextTransferRemindCount = transferRemindCount + 1;
@@ -158,6 +161,7 @@ export async function markReturned(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -166,7 +170,7 @@ export async function markReturned(
     if (product.status !== "listed" && product.status !== "transferred") {
       throw new ProductActionError("只有已上新或已调货商品可以执行回库");
     }
-    if (!isInReturnReminder(product, now)) {
+    if (!isInReturnReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入回库提醒列表");
     }
 
@@ -184,6 +188,7 @@ export async function postponeReturnReminder(
   db: ProductDb,
   barcode: string,
   now = getCurrentTimestamp(),
+  settings: ReminderSettings = DEFAULT_REMINDER_SETTINGS,
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
@@ -192,13 +197,13 @@ export async function postponeReturnReminder(
     if (product.status !== "listed" && product.status !== "transferred") {
       throw new ProductActionError("只有已上新或已调货商品可以推后回库提醒");
     }
-    if (!isInReturnReminder(product, now)) {
+    if (!isInReturnReminder(product, now, settings)) {
       throw new ProductActionError("商品尚未进入回库提醒列表");
     }
 
     const returnRemindCount = normalizeCount(product.returnRemindCount);
-    if (returnRemindCount >= MAX_RETURN_POSTPONE_COUNT) {
-      throw new ProductActionError("回库提醒最多只能推后 2 次");
+    if (returnRemindCount >= settings.maxReturnPostponeCount) {
+      throw new ProductActionError(`回库提醒最多只能推后 ${settings.maxReturnPostponeCount} 次`);
     }
 
     const nextReturnRemindCount = returnRemindCount + 1;
