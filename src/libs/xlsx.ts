@@ -39,7 +39,7 @@ function parseCreatedTime(value: unknown): number {
 }
 
 /**
- * Map raw row data to Product structure
+ * 将原始行数据映射为商品结构
  */
 function mapRowToProduct(row: Record<string, unknown>): Product {
   const product: Product = {
@@ -77,7 +77,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
 }
 
 /**
- * Map raw row data to Stock structure
+ * 将原始行数据映射为库存结构
  */
 function mapRowToStock(row: Record<string, unknown>): Stock {
   const stock: Stock = {
@@ -111,11 +111,11 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
 }
 
 /**
- * Fetch xlsx file from URL and parse to a mapped row array
- * @param url - URL of the xlsx file
- * @param mapRow - Row mapper, e.g. mapRowToProduct or mapRowToStock
- * @param sheetName - Optional sheet name to read (defaults to first sheet)
- * @returns Array of mapped row objects
+ * 从 URL 获取 xlsx 文件，并解析为映射后的行数据
+ * @param url xlsx 文件 URL
+ * @param mapRow 行映射函数，例如 mapRowToProduct 或 mapRowToStock
+ * @param sheetName 可选工作表名称，默认读取第一个工作表
+ * @returns 映射后的行数据数组
  */
 async function fetchAndParseXlsx<T extends Product | Stock>(
   url: string,

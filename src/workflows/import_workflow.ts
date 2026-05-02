@@ -1,7 +1,7 @@
 /**
  * ---
  * name: 有赞商品数据导入至Agent
- * description: 从有赞系统中导出的xlsx文件中导入商品数据到数据库中，更新数据库中的商品信息。
+ * description: 从有赞系统中导出的xlsx文件中导入商品和库存数据到数据库中。
  *
  * output:
  * - success: bool
@@ -12,8 +12,9 @@
 
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis, type ExecutionResult } from "../api";
+import { DB_TABLES, initDB } from "../libs/db";
+import { getCurrentTimestamp } from "../libs/reminders";
 import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
-import { initDB } from "../libs/db";
 import type { Product, Stock } from "../models/types";
 
 type ReportType = "product" | "stock";
@@ -25,18 +26,83 @@ interface ImportStats {
   importedRows: number;
 }
 
-type XlsxParser<T> = (url: string) => Promise<T[]>;
-type RowUpserter<T> = (db: any, row: T) => Promise<void>;
+interface ReportUrlScan {
+  newUrls: string[];
+  skippedReports: number;
+}
+
+interface ParsedStockReport {
+  url: string;
+  stocks: Stock[];
+}
+
+function createImportStats(reportType: ReportType): ImportStats {
+  return {
+    reportType,
+    importedReports: 0,
+    skippedReports: 0,
+    importedRows: 0,
+  };
+}
+
+function parseReportUrls(result: ExecutionResult): string[] {
+  if (!result.success || !result.task) return [];
+
+  const rawReportList = JSON.parse(result.task.extract_data || "[]") as unknown[];
+  const urls = rawReportList
+    .map((item) => String(item).trim())
+    .filter((url) => url.length > 0);
+  return [...new Set(urls)];
+}
+
+async function scanNewReportUrls(
+  db: any,
+  reportType: ReportType,
+  result: ExecutionResult,
+): Promise<ReportUrlScan> {
+  const newUrls: string[] = [];
+  let skippedReports = 0;
+
+  for (const url of parseReportUrls(result)) {
+    const existingReport = await db
+      .table(DB_TABLES.report)
+      .where("[type+url]")
+      .equals([reportType, url])
+      .first();
+
+    if (existingReport !== undefined) {
+      skippedReports += 1;
+      console.log(`${reportType} report ${url} already exists`);
+      continue;
+    }
+
+    newUrls.push(url);
+  }
+
+  return { newUrls, skippedReports };
+}
+
+async function markReportImported(
+  db: any,
+  reportType: ReportType,
+  url: string,
+): Promise<void> {
+  await db.table(DB_TABLES.report).add({
+    type: reportType,
+    url,
+    timestamp: getCurrentTimestamp(),
+  });
+}
 
 async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   const existingProduct = await db
-    .table("product")
+    .table(DB_TABLES.product)
     .where("barcode")
     .equals(product.barcode)
     .first();
 
   if (existingProduct?.id != null) {
-    await db.table("product").update(existingProduct.id, {
+    await db.table(DB_TABLES.product).update(existingProduct.id, {
       name: product.name,
       barcode: product.barcode,
       costPrice: product.costPrice,
@@ -45,7 +111,7 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   }
 
   try {
-    await db.table("product").add({
+    await db.table(DB_TABLES.product).add({
       ...product,
       status: "pending",
       listingRemindCount: product.listingRemindCount ?? 0,
@@ -56,13 +122,13 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
     if (!(error instanceof Dexie.ConstraintError)) throw error;
 
     const racedProduct = await db
-      .table("product")
+      .table(DB_TABLES.product)
       .where("barcode")
       .equals(product.barcode)
       .first();
     if (!racedProduct?.id) throw error;
 
-    await db.table("product").update(racedProduct.id, {
+    await db.table(DB_TABLES.product).update(racedProduct.id, {
       name: product.name,
       barcode: product.barcode,
       costPrice: product.costPrice,
@@ -70,102 +136,81 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   }
 }
 
-async function upsertImportedStock(db: any, stock: Stock): Promise<void> {
-  const existingStock = await db
-    .table("stock")
-    .where("[barcode+store]")
-    .equals([stock.barcode, stock.store])
-    .first();
-
-  if (existingStock?.id != null) {
-    await db.table("stock").update(existingStock.id, {
-      stock: stock.stock,
-      lastUpdatedTime: stock.lastUpdatedTime,
-    });
-    return;
-  }
-
-  try {
-    await db.table("stock").add(stock);
-  } catch (error) {
-    if (!(error instanceof Dexie.ConstraintError)) throw error;
-
-    const racedStock = await db
-      .table("stock")
-      .where("[barcode+store]")
-      .equals([stock.barcode, stock.store])
-      .first();
-    if (!racedStock?.id) throw error;
-
-    await db.table("stock").update(racedStock.id, {
-      stock: stock.stock,
-      lastUpdatedTime: stock.lastUpdatedTime,
-    });
-  }
-}
-
-function parseReportUrls(result: ExecutionResult): string[] {
-  if (!result.success || !result.task) return [];
-
-  const rawReportList = JSON.parse(result.task.extract_data || "[]") as unknown[];
-  return rawReportList
-    .map((item) => String(item).trim())
-    .filter((url) => url.length > 0);
-}
-
-async function importReportRows<T>(
+async function importProductReports(
   db: any,
-  reportType: ReportType,
   result: ExecutionResult,
-  parseXlsx: XlsxParser<T>,
-  upsertRow: RowUpserter<T>,
-  beforeImport?: () => Promise<void>,
 ): Promise<ImportStats> {
-  const stats: ImportStats = {
-    reportType,
-    importedReports: 0,
-    skippedReports: 0,
-    importedRows: 0,
-  };
-  let hasImportedAnyReport = false;
+  const stats = createImportStats("product");
+  const { newUrls, skippedReports } = await scanNewReportUrls(db, "product", result);
+  stats.skippedReports = skippedReports;
 
-  for (const url of parseReportUrls(result)) {
-    const existingReport = await db
-      .table("report")
-      .where("[type+url]")
-      .equals([reportType, url])
-      .first();
-
-    if (existingReport !== undefined) {
-      stats.skippedReports += 1;
-      console.log(`${reportType} report ${url} already exists`);
-      continue;
-    }
-
-    // 库存等全量快照导入，需要在确认存在新报表后再执行一次性准备工作。
-    if (!hasImportedAnyReport) {
-      await beforeImport?.();
-      hasImportedAnyReport = true;
-    }
-
-    const rows = await parseXlsx(url);
-    for (const row of rows) {
-      await upsertRow(db, row);
+  for (const url of newUrls) {
+    const products = await fetchAndParseProductXlsx(url);
+    for (const product of products) {
+      await upsertImportedProduct(db, product);
       stats.importedRows += 1;
     }
 
-    await db.table("report").add({
-      type: reportType,
-      url,
-      timestamp: Math.floor(Date.now() / 1000),
-    });
+    await markReportImported(db, "product", url);
     stats.importedReports += 1;
   }
 
   return stats;
 }
 
-// Main workflow entry point
+function mergeStockRows(stocks: Stock[]): Stock[] {
+  const stocksByStore = new Map<string, Stock>();
+
+  stocks.forEach((stock) => {
+    stocksByStore.set(`${stock.barcode}\u0000${stock.store}`, stock);
+  });
+
+  return [...stocksByStore.values()];
+}
+
+async function importStockReports(
+  db: any,
+  result: ExecutionResult,
+): Promise<ImportStats> {
+  const stats = createImportStats("stock");
+  const { newUrls, skippedReports } = await scanNewReportUrls(db, "stock", result);
+  stats.skippedReports = skippedReports;
+
+  if (newUrls.length === 0) return stats;
+
+  const parsedReports: ParsedStockReport[] = [];
+  for (const url of newUrls) {
+    parsedReports.push({
+      url,
+      stocks: await fetchAndParseStockXlsx(url),
+    });
+  }
+
+  const mergedStocks = mergeStockRows(parsedReports.flatMap((report) => report.stocks));
+
+  await db.transaction(
+    "rw",
+    db.table(DB_TABLES.stock),
+    db.table(DB_TABLES.report),
+    async () => {
+      await db.table(DB_TABLES.stock).clear();
+      if (mergedStocks.length > 0) {
+        await db.table(DB_TABLES.stock).bulkAdd(mergedStocks);
+      }
+
+      for (const report of parsedReports) {
+        await markReportImported(db, "stock", report.url);
+      }
+    },
+  );
+
+  stats.importedReports = parsedReports.length;
+  stats.importedRows = mergedStocks.length;
+
+  return stats;
+}
+
+// 工作流入口
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
   const apis = createWorkflowApis(agent);
@@ -177,26 +222,10 @@ export async function execute(context: WorkflowContext) {
 
   try {
     const goodsReportResult = await apis.get_goods_report();
-    const productStats = await importReportRows(
-      db,
-      "product",
-      goodsReportResult,
-      fetchAndParseProductXlsx,
-      upsertImportedProduct,
-    );
+    const productStats = await importProductReports(db, goodsReportResult);
 
     const stockReportResult = await apis.get_stock_report();
-    const stockStats = await importReportRows(
-      db,
-      "stock",
-      stockReportResult,
-      fetchAndParseStockXlsx,
-      upsertImportedStock,
-      async () => {
-        // 库存报表是全量快照；没有新库存报表时保留旧库存。
-        await db.table("stock").clear();
-      },
-    );
+    const stockStats = await importStockReports(db, stockReportResult);
 
     return {
       success: true,

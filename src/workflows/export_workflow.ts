@@ -14,7 +14,7 @@ import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis } from "../api";
 import { getYesterdayRange } from "../libs/date";
 
-// Main workflow entry point
+// 工作流入口
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
   const apis = createWorkflowApis(agent);

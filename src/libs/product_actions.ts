@@ -1,4 +1,5 @@
 import type { Product } from "../models/types";
+import { DB_TABLES } from "./db";
 import {
   getCurrentTimestamp,
   isInListingReminder,
@@ -22,7 +23,7 @@ export class ProductActionError extends Error {
 }
 
 async function getProductByBarcode(db: ProductDb, barcode: string): Promise<Product> {
-  const product = (await db.table("product").where("barcode").equals(barcode).first()) as
+  const product = (await db.table(DB_TABLES.product).where("barcode").equals(barcode).first()) as
     | Product
     | undefined;
   if (!product || product.id == null) {
@@ -33,7 +34,7 @@ async function getProductByBarcode(db: ProductDb, barcode: string): Promise<Prod
 
 async function updateProduct(db: ProductDb, product: Product, changes: Partial<Product>): Promise<void> {
   if (product.id == null) throw new ProductActionError("商品记录缺少数据库主键");
-  await db.table("product").update(product.id, changes);
+  await db.table(DB_TABLES.product).update(product.id, changes);
 }
 
 export async function markListed(
@@ -43,7 +44,7 @@ export async function markListed(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "pending") {
       throw new ProductActionError("只有待上新商品可以执行上新");
@@ -69,7 +70,7 @@ export async function postponeListingReminder(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "pending") {
       throw new ProductActionError("只有待上新商品可以推后上新提醒");
@@ -97,7 +98,7 @@ export async function markTransferred(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "listed") {
       throw new ProductActionError("只有已上新商品可以执行调货");
@@ -123,7 +124,7 @@ export async function postponeTransferReminder(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "listed") {
       throw new ProductActionError("只有已上新商品可以推后调货提醒");
@@ -160,7 +161,7 @@ export async function markReturned(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "listed" && product.status !== "transferred") {
       throw new ProductActionError("只有已上新或已调货商品可以执行回库");
@@ -186,7 +187,7 @@ export async function postponeReturnReminder(
 ): Promise<Product> {
   let updatedProduct: Product | undefined;
 
-  await db.transaction("rw", db.table("product"), async () => {
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
     const product = await getProductByBarcode(db, barcode);
     if (product.status !== "listed" && product.status !== "transferred") {
       throw new ProductActionError("只有已上新或已调货商品可以推后回库提醒");

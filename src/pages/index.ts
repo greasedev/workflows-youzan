@@ -6,7 +6,7 @@
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
 import { Product, DurationResult, Stock } from "../models/types";
 import { formatDate, formatOptionalDate } from "../libs/date";
-import { initDB } from "../libs/db";
+import { DB_TABLES, initDB } from "../libs/db";
 import {
   markListed,
   markReturned,
@@ -17,6 +17,7 @@ import {
   ProductActionError,
 } from "../libs/product_actions";
 import {
+  getCurrentTimestamp,
   isInListingReminder,
   isInReturnReminder,
   isInTransferReminder,
@@ -46,17 +47,40 @@ type ProductAction =
   | "postpone-transfer"
   | "mark-returned"
   | "postpone-return";
+type DisplayProductsByList = Record<ProductListType, Product[]>;
+
+interface TableColumn {
+  title: string;
+  width: number;
+}
 
 const LIST_TYPES: ProductListType[] = ["listing", "transfer", "return"];
+const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
+  listing: [
+    { title: "商品信息", width: 240 },
+    { title: "建档时间", width: 180 },
+    { title: "建档时长", width: 140 },
+    { title: "操作", width: 220 },
+  ],
+  transfer: [
+    { title: "商品信息", width: 240 },
+    { title: "上新时间", width: 180 },
+    { title: "门店库存", width: 180 },
+    { title: "操作", width: 220 },
+  ],
+  return: [
+    { title: "商品信息", width: 240 },
+    { title: "上新时间", width: 180 },
+    { title: "当前状态", width: 140 },
+    { title: "门店库存", width: 180 },
+    { title: "操作", width: 220 },
+  ],
+};
 
 let activeListType: ProductListType = "listing";
 
 function isProductListType(value: string | undefined): value is ProductListType {
   return value === "listing" || value === "transfer" || value === "return";
-}
-
-function getNowTimestamp(): number {
-  return Math.floor(Date.now() / 1000);
 }
 
 /**
@@ -125,6 +149,14 @@ function getDisplayProducts(
     .sort((a, b) => getReminderDueTime(a, listType) - getReminderDueTime(b, listType));
 }
 
+function getDisplayProductsByList(allProducts: Product[], now: number): DisplayProductsByList {
+  return {
+    listing: getDisplayProducts(allProducts, "listing", now),
+    transfer: getDisplayProducts(allProducts, "transfer", now),
+    return: getDisplayProducts(allProducts, "return", now),
+  };
+}
+
 function getEmptyText(listType: ProductListType): string {
   if (listType === "transfer") return "暂无待调货商品";
   if (listType === "return") return "暂无待回库商品";
@@ -132,40 +164,20 @@ function getEmptyText(listType: ProductListType): string {
 }
 
 function getTableColumnCount(listType: ProductListType): number {
-  return listType === "listing" ? 4 : 5;
+  return TABLE_COLUMNS[listType].length;
+}
+
+function shouldLoadStocks(listType: ProductListType): boolean {
+  return listType === "transfer" || listType === "return";
 }
 
 function renderTableHead(listType: ProductListType): void {
   const tableHead = document.getElementById("product-table-head");
   if (!tableHead) return;
 
-  if (listType === "transfer") {
-    tableHead.innerHTML = `
-      <th style="width: 240px;">商品信息</th>
-      <th style="width: 180px;">上新时间</th>
-      <th style="width: 180px;">门店库存</th>
-      <th style="width: 220px;">操作</th>
-    `;
-    return;
-  }
-
-  if (listType === "return") {
-    tableHead.innerHTML = `
-      <th style="width: 240px;">商品信息</th>
-      <th style="width: 180px;">上新时间</th>
-      <th style="width: 140px;">当前状态</th>
-      <th style="width: 180px;">门店库存</th>
-      <th style="width: 220px;">操作</th>
-    `;
-    return;
-  }
-
-  tableHead.innerHTML = `
-    <th style="width: 240px;">商品信息</th>
-    <th style="width: 180px;">建档时间</th>
-    <th style="width: 140px;">建档时长</th>
-    <th style="width: 220px;">操作</th>
-  `;
+  tableHead.innerHTML = TABLE_COLUMNS[listType]
+    .map((column) => `<th style="width: ${column.width}px;">${column.title}</th>`)
+    .join("");
 }
 
 function renderProductInfo(product: Product): string {
@@ -189,9 +201,10 @@ function renderActionButton(
 }
 
 function renderStoreStock(stocks: Stock[] | undefined): string {
-  if (!stocks || stocks.length === 0) return `<span class="empty-value">-</span>`;
+  const positiveStocks = (stocks ?? []).filter((stock) => stock.stock > 0);
+  if (positiveStocks.length === 0) return `<span class="empty-value">-</span>`;
 
-  const stockRows = stocks
+  const stockRows = positiveStocks
     .map(
       (stock) => `
         <div class="stock-line">
@@ -211,7 +224,7 @@ async function getStocksByBarcodeForProducts(products: Product[]): Promise<Map<s
   if (uniqueBarcodes.length === 0) return stocksByBarcode;
 
   const stocks = (await db
-    .table("stock")
+    .table(DB_TABLES.stock)
     .where("barcode")
     .anyOf(uniqueBarcodes)
     .toArray()) as Stock[];
@@ -229,66 +242,75 @@ async function getStocksByBarcodeForProducts(products: Product[]): Promise<Map<s
   return stocksByBarcode;
 }
 
-function renderProductRow(
-  product: Product,
-  listType: ProductListType,
-  stocksByBarcode?: Map<string, Stock[]>,
-): string {
+async function getStocksByBarcodeForList(
+  products: Product[],
+): Promise<Map<string, Stock[]>> {
+  try {
+    return await getStocksByBarcodeForProducts(products);
+  } catch (error) {
+    console.error("Failed to load stock data:", error);
+    showToast("库存数据加载失败", "error");
+    return new Map<string, Stock[]>();
+  }
+}
+
+function renderTransferRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
   const barcode = product.barcode;
+  const actionButtons = [
+    renderActionButton("mark-transferred", barcode, "调货", "primary"),
+    normalizeCount(product.transferRemindCount) < MAX_TRANSFER_POSTPONE_COUNT
+      ? renderActionButton("postpone-transfer", barcode, "1周后提醒", "secondary")
+      : "",
+  ].join("");
 
-  if (listType === "transfer") {
-    const actionButtons = [
-      renderActionButton("mark-transferred", barcode, "调货", "primary"),
-      normalizeCount(product.transferRemindCount) < MAX_TRANSFER_POSTPONE_COUNT
-        ? renderActionButton("postpone-transfer", barcode, "1周后提醒", "secondary")
-        : "",
-    ].join("");
+  return `
+    <tr data-barcode="${escapeAttribute(barcode)}">
+      <td>${renderProductInfo(product)}</td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
+        </div>
+      </td>
+      <td>
+        ${renderStoreStock(stocksByBarcode?.get(barcode))}
+      </td>
+      <td><div class="actions">${actionButtons}</div></td>
+    </tr>
+  `;
+}
 
-    return `
-      <tr data-barcode="${escapeAttribute(barcode)}">
-        <td>${renderProductInfo(product)}</td>
-        <td>
-          <div class="time-info">
-            <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
-          </div>
-        </td>
-        <td>
-          ${renderStoreStock(stocksByBarcode?.get(barcode))}
-        </td>
-        <td><div class="actions">${actionButtons}</div></td>
-      </tr>
-    `;
-  }
+function renderReturnRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+  const barcode = product.barcode;
+  const actionButtons = [
+    renderActionButton("mark-returned", barcode, "回库", "primary"),
+    normalizeCount(product.returnRemindCount) < MAX_RETURN_POSTPONE_COUNT
+      ? renderActionButton("postpone-return", barcode, "1周后提醒", "secondary")
+      : "",
+  ].join("");
 
-  if (listType === "return") {
-    const actionButtons = [
-      renderActionButton("mark-returned", barcode, "回库", "primary"),
-      normalizeCount(product.returnRemindCount) < MAX_RETURN_POSTPONE_COUNT
-        ? renderActionButton("postpone-return", barcode, "1周后提醒", "secondary")
-        : "",
-    ].join("");
+  return `
+    <tr data-barcode="${escapeAttribute(barcode)}">
+      <td>${renderProductInfo(product)}</td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
+        </div>
+      </td>
+      <td>
+        <div class="time-info">
+          <div class="duration">${getStatusText(product)}</div>
+        </div>
+      </td>
+      <td>
+        ${renderStoreStock(stocksByBarcode?.get(barcode))}
+      </td>
+      <td><div class="actions">${actionButtons}</div></td>
+    </tr>
+  `;
+}
 
-    return `
-      <tr data-barcode="${escapeAttribute(barcode)}">
-        <td>${renderProductInfo(product)}</td>
-        <td>
-          <div class="time-info">
-            <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
-          </div>
-        </td>
-        <td>
-          <div class="time-info">
-            <div class="duration">${getStatusText(product)}</div>
-          </div>
-        </td>
-        <td>
-          ${renderStoreStock(stocksByBarcode?.get(barcode))}
-        </td>
-        <td><div class="actions">${actionButtons}</div></td>
-      </tr>
-    `;
-  }
-
+function renderListingRow(product: Product): string {
+  const barcode = product.barcode;
   const duration = getDuration(product.createdTime);
 
   return `
@@ -314,19 +336,29 @@ function renderProductRow(
   `;
 }
 
+function renderProductRow(
+  product: Product,
+  listType: ProductListType,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
+  if (listType === "transfer") return renderTransferRow(product, stocksByBarcode);
+  if (listType === "return") return renderReturnRow(product, stocksByBarcode);
+  return renderListingRow(product);
+}
+
 async function renderProducts(): Promise<void> {
   const tbody = document.getElementById("product-list");
   if (!tbody) return;
 
   renderTableHead(activeListType);
 
-  const now = getNowTimestamp();
-  const allProducts = (await db.table("product").toArray()) as Product[];
-  updateTabCounts(allProducts, now);
-  const displayProducts = getDisplayProducts(allProducts, activeListType, now);
-  const stocksByBarcode =
-    activeListType === "transfer" || activeListType === "return"
-      ? await getStocksByBarcodeForProducts(displayProducts)
+  const now = getCurrentTimestamp();
+  const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
+  const displayProductsByList = getDisplayProductsByList(allProducts, now);
+  updateTabCounts(displayProductsByList);
+  const displayProducts = displayProductsByList[activeListType];
+  const stocksByBarcode = shouldLoadStocks(activeListType)
+      ? await getStocksByBarcodeForList(displayProducts)
       : undefined;
 
   if (displayProducts.length === 0) {
@@ -370,17 +402,17 @@ function bindProductEvents(): void {
   });
 }
 
-function updateTabCounts(allProducts: Product[], now: number): void {
+function updateTabCounts(displayProductsByList: DisplayProductsByList): void {
   LIST_TYPES.forEach((listType) => {
     const countEl = document.querySelector(`[data-count-type="${listType}"]`);
     if (countEl) {
-      countEl.textContent = String(getDisplayProducts(allProducts, listType, now).length);
+      countEl.textContent = String(displayProductsByList[listType].length);
     }
   });
 }
 
 async function getProductForDialog(barcode: string): Promise<Product | undefined> {
-  return (await db.table("product").where("barcode").equals(barcode).first()) as
+  return (await db.table(DB_TABLES.product).where("barcode").equals(barcode).first()) as
     | Product
     | undefined;
 }
@@ -539,7 +571,7 @@ function updateActiveTab(listType: ProductListType): void {
 }
 
 async function getProducts(): Promise<Product[]> {
-  return (await db.table("product").toArray()) as Product[];
+  return (await db.table(DB_TABLES.product).toArray()) as Product[];
 }
 
 const ProductApp = {

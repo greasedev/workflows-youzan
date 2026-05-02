@@ -11,7 +11,7 @@
  */
 
 import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
-import { initDB } from "../libs/db";
+import { DB_TABLES, initDB } from "../libs/db";
 import { calculateWeeklyStats, getPreviousWeekPeriod } from "../libs/weekly_stats";
 import type { Product } from "../models/types";
 
@@ -24,7 +24,7 @@ export async function execute(context: WorkflowContext) {
   console.log("Executing weekly stats workflow...");
 
   try {
-    const products = (await db.table("product").toArray()) as Product[];
+    const products = (await db.table(DB_TABLES.product).toArray()) as Product[];
     const stats = calculateWeeklyStats(products, getPreviousWeekPeriod());
 
     return {
