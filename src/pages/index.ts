@@ -131,6 +131,10 @@ function getEmptyText(listType: ProductListType): string {
   return "暂无待上新商品";
 }
 
+function getTableColumnCount(listType: ProductListType): number {
+  return listType === "listing" ? 4 : 5;
+}
+
 function renderTableHead(listType: ProductListType): void {
   const tableHead = document.getElementById("product-table-head");
   if (!tableHead) return;
@@ -150,6 +154,7 @@ function renderTableHead(listType: ProductListType): void {
       <th style="width: 240px;">商品信息</th>
       <th style="width: 180px;">上新时间</th>
       <th style="width: 140px;">当前状态</th>
+      <th style="width: 180px;">门店库存</th>
       <th style="width: 220px;">操作</th>
     `;
     return;
@@ -276,6 +281,9 @@ function renderProductRow(
             <div class="duration">${getStatusText(product)}</div>
           </div>
         </td>
+        <td>
+          ${renderStoreStock(stocksByBarcode?.get(barcode))}
+        </td>
         <td><div class="actions">${actionButtons}</div></td>
       </tr>
     `;
@@ -317,14 +325,14 @@ async function renderProducts(): Promise<void> {
   updateTabCounts(allProducts, now);
   const displayProducts = getDisplayProducts(allProducts, activeListType, now);
   const stocksByBarcode =
-    activeListType === "transfer"
+    activeListType === "transfer" || activeListType === "return"
       ? await getStocksByBarcodeForProducts(displayProducts)
       : undefined;
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="4">
+        <td colspan="${getTableColumnCount(activeListType)}">
           <div class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
