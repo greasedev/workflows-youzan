@@ -138,9 +138,8 @@ function renderTableHead(listType: ProductListType): void {
   if (listType === "transfer") {
     tableHead.innerHTML = `
       <th style="width: 240px;">商品信息</th>
-      <th style="width: 110px;">零售价</th>
       <th style="width: 180px;">上新时间</th>
-      <th style="width: 150px;">门店库存</th>
+      <th style="width: 180px;">门店库存</th>
       <th style="width: 220px;">操作</th>
     `;
     return;
@@ -149,9 +148,8 @@ function renderTableHead(listType: ProductListType): void {
   if (listType === "return") {
     tableHead.innerHTML = `
       <th style="width: 240px;">商品信息</th>
-      <th style="width: 110px;">零售价</th>
       <th style="width: 180px;">上新时间</th>
-      <th style="width: 110px;">当前状态</th>
+      <th style="width: 140px;">当前状态</th>
       <th style="width: 220px;">操作</th>
     `;
     return;
@@ -159,9 +157,8 @@ function renderTableHead(listType: ProductListType): void {
 
   tableHead.innerHTML = `
     <th style="width: 240px;">商品信息</th>
-    <th style="width: 110px;">零售价</th>
     <th style="width: 180px;">建档时间</th>
-    <th style="width: 110px;">建档时长</th>
+    <th style="width: 140px;">建档时长</th>
     <th style="width: 220px;">操作</th>
   `;
 }
@@ -245,7 +242,6 @@ function renderProductRow(
     return `
       <tr data-barcode="${escapeAttribute(barcode)}">
         <td>${renderProductInfo(product)}</td>
-        <td>${formatPrice(product.costPrice)}</td>
         <td>
           <div class="time-info">
             <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
@@ -270,7 +266,6 @@ function renderProductRow(
     return `
       <tr data-barcode="${escapeAttribute(barcode)}">
         <td>${renderProductInfo(product)}</td>
-        <td>${formatPrice(product.costPrice)}</td>
         <td>
           <div class="time-info">
             <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
@@ -291,7 +286,6 @@ function renderProductRow(
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
       <td>${renderProductInfo(product)}</td>
-      <td>${formatPrice(product.costPrice)}</td>
       <td>
         <div class="time-info">
           <div class="create-time">${formatDate(product.createdTime)}</div>
@@ -330,7 +324,7 @@ async function renderProducts(): Promise<void> {
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5">
+        <td colspan="4">
           <div class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
