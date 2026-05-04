@@ -35,6 +35,39 @@ export interface Stock {
 }
 ```
 
+## 参数设置数据结构
+
+```typescript
+type ReminderTimeUnit = "day" | "week";
+export interface ReminderSettings {
+  id: "reminder-settings"; // 固定设置记录主键
+  listingReminderDays: number; // 上新提醒时间，按天保存，默认 21
+  listingReminderUnit: ReminderTimeUnit; // 上新提醒时间在页面中的展示单位，默认 week
+  transferReminderDays: number; // 调货提醒时间，按天保存，默认 21
+  transferReminderUnit: ReminderTimeUnit; // 调货提醒时间在页面中的展示单位，默认 week
+  returnReminderDays: number; // 回库提醒时间，按天保存，默认 42
+  returnReminderUnit: ReminderTimeUnit; // 回库提醒时间在页面中的展示单位，默认 week
+  maxTransferPostponeCount: number; // 调货提醒最大推后次数，默认 2
+  maxReturnPostponeCount: number; // 回库提醒最大推后次数，默认 2
+}
+```
+
+## 参数设置
+
+- 提醒列表切换区域最右侧展示 `参数设置` 入口。
+- 点击 `参数设置` 后弹出参数设置框。
+- 可设置参数：
+  - 上新提醒时间，默认 3 周，单位可切换为天/周。
+  - 调货提醒时间，默认 3 周，单位可切换为天/周。
+  - 回库提醒时间，默认 6 周，单位可切换为天/周。
+  - 调货提醒最大推后次数，默认 2 次。
+  - 回库提醒最大推后次数，默认 2 次。
+- 提醒时间在业务计算中按天保存；单位只用于页面回显。
+- 提醒时间必须为正整数；最大推后次数必须为非负整数，允许设置为 0。
+- 参数保存到 `settings` 表，固定记录主键为 `reminder-settings`；没有保存记录时使用默认值。
+- 修改参数后，三类提醒列表和周统计都按最新参数计算。
+- 已经存在的 `listingRemindTime`、`transferRemindTime`、`returnRemindTime` 是绝对提醒时间，参数修改后不重算。
+
 ## 数据导入
 
 ### 商品导入
@@ -81,7 +114,7 @@ export interface Stock {
 
 ### 过滤条件
 
-- `listingRemindTime` 字段为空，且 当前时间 - `createdTime` 字段 >= 21 天，且 `status` 字段为 `pending`。
+- `listingRemindTime` 字段为空，且 当前时间 - `createdTime` 字段 >= 参数设置中的上新提醒时间，且 `status` 字段为 `pending`。
 - `listingRemindTime` 字段不为空，且 `listingRemindTime` 字段比当前时间早，且 `status` 字段为 `pending`。
 
 ### 操作
@@ -102,13 +135,13 @@ export interface Stock {
 
 ### 过滤条件
 
-- `transferRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 21 天，且 `status` 字段为 `listed`。
+- `transferRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的调货提醒时间，且 `status` 字段为 `listed`。
 - `transferRemindTime` 字段不为空，且 `listedTime` 字段不为空，且 `transferRemindTime` 字段比当前时间早，且 `status` 字段为 `listed`。
 
 ### 操作
 
 - 调货：点击 `调货` 按钮，`status` 字段变更为 `transferred`，变更状态时需要确保此时数据库中 `status` 字段的值为 `listed`，否则会报错；在同一个事务中校验当前 `status`，并同时更新 `status` 和对应时间字段。
-- 1周后提醒：点击 `1周后提醒` 按钮，`transferRemindCount` 字段加 1，同时更新 `transferRemindTime` 字段为当前时间加上 7 天；`1周后提醒` 按钮允许出现 2 次，当 `transferRemindCount` 字段值达到 2 时，`1周后提醒` 按钮不再显示。
+- 1周后提醒：点击 `1周后提醒` 按钮，`transferRemindCount` 字段加 1，同时更新 `transferRemindTime` 字段为当前时间加上 7 天；`1周后提醒` 按钮允许出现的次数由参数设置中的调货提醒最大推后次数决定，当 `transferRemindCount` 字段值达到该次数时，`1周后提醒` 按钮不再显示。
 
 ## 回库提醒列表
 
@@ -124,13 +157,13 @@ export interface Stock {
 
 ### 过滤条件
 
-- `returnRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 42 天，且 `status` 字段为 `listed` 或 `transferred`。
+- `returnRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的回库提醒时间，且 `status` 字段为 `listed` 或 `transferred`。
 - `returnRemindTime` 字段不为空，且 `listedTime` 字段不为空，且 `returnRemindTime` 字段比当前时间早，且 `status` 字段为 `listed` 或 `transferred`。
 
 ### 操作
 
 - 回库：点击 `回库` 按钮，`status` 字段变更为 `returned`，变更状态时需要确保此时数据库中 `status` 字段的值为 `listed` 或 `transferred`，否则会报错；在同一个事务中校验当前 `status`，并同时更新 `status` 和对应时间字段。
-- 1周后提醒：点击 `1周后提醒` 按钮，`returnRemindCount` 字段加 1，同时更新 `returnRemindTime` 字段为当前时间加上 7 天；`1周后提醒` 按钮允许出现 2 次，当 `returnRemindCount` 字段值达到 2 时，`1周后提醒` 按钮不再显示。
+- 1周后提醒：点击 `1周后提醒` 按钮，`returnRemindCount` 字段加 1，同时更新 `returnRemindTime` 字段为当前时间加上 7 天；`1周后提醒` 按钮允许出现的次数由参数设置中的回库提醒最大推后次数决定，当 `returnRemindCount` 字段值达到该次数时，`1周后提醒` 按钮不再显示。
 
 ### 数据状态约束
 
@@ -165,8 +198,14 @@ A：可以。
 ### Q：商品回库后，是否还会出现在任何提醒列表中？
 A：商品回库后，`status` 字段变更为 `returned`，不再出现在任何提醒列表中。
 
-### Q: 上新提醒是 3 天，调货和回库是 7 天。这个差异是业务规则还是需要统一？
-A：这是业务规则，不能统一，后续用户可以通过设置页面进行个性化配置，目前暂不提供配置页面。
+### Q: 上新推后提醒是 3 天，调货和回库推后提醒是 7 天。这个差异是业务规则还是需要统一？
+A：这是业务规则，不能统一。本次参数设置只配置首次进入提醒列表的时间和调货/回库最大推后次数，不配置推后提醒间隔。
+
+### Q：参数设置会影响哪些业务计算？
+A：参数设置会影响三类提醒列表的首次进入时间、调货/回库推后按钮显隐和动作校验、以及周统计中的首次进入提醒和待处理提醒数量。
+
+### Q：参数设置修改后，已经推后过的商品是否重算提醒时间？
+A：不重算。`listingRemindTime`、`transferRemindTime`、`returnRemindTime` 是用户操作后产生的绝对提醒时间，参数修改后保持不变。
 
 ### Q: `调货提醒列表` 中是否也需要显示"回库"按钮？
 A：不需要，`调货提醒列表` 中满足回库要求的商品也会出现在 `回库提醒列表` 中。
@@ -181,10 +220,11 @@ A：页面层仍做防御性过滤，只展示 `stock > 0` 的库存记录。
 
 每周一凌晨 01:00 统计一次，`统计周期` 为上周一 00:00 至上周日 23:59。
 计算“统计周期内待处理提醒商品数”时，提醒列表过滤条件中的“当前时间”固定为 `统计周期` 结束时间，而不是统计任务实际执行时间。
+周统计使用统计任务执行时最新的参数设置；没有设置记录时使用默认参数。
 例如，如果今天是周一（比如4月27日），则 `统计周期` 是 4月20日 00:00 至 4月26日 23:59。
-- `统计周期` 内首次进入 `上新提醒列表` 的商品：`createdTime` 字段在 3月30日 00:00 至 4月5日 23:59 之间的商品。
-- `统计周期` 内首次进入 `调货提醒列表` 的商品：`listedTime` 字段在 3月30日 00:00 至 4月5日 23:59 之间的商品。
-- `统计周期` 内首次进入 `回库提醒列表` 的商品：`listedTime` 字段在 3月9日 00:00 至 3月15日 23:59 之间的商品。
+- 默认参数下，`统计周期` 内首次进入 `上新提醒列表` 的商品：`createdTime` 字段在 3月30日 00:00 至 4月5日 23:59 之间的商品。
+- 默认参数下，`统计周期` 内首次进入 `调货提醒列表` 的商品：`listedTime` 字段在 3月30日 00:00 至 4月5日 23:59 之间的商品。
+- 默认参数下，`统计周期` 内首次进入 `回库提醒列表` 的商品：`listedTime` 字段在 3月9日 00:00 至 3月15日 23:59 之间的商品。
 
 ### 上新提醒统计
 
