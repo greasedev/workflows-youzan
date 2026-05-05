@@ -89,6 +89,16 @@
                     </div>
                 </div>
                 <div class="settings-row">
+                    <label class="settings-label" for="transfer-reminder-deadline-value">调货提醒截止时间</label>
+                    <div class="settings-control">
+                        <input class="settings-input" id="transfer-reminder-deadline-value" name="transferReminderDeadlineValue" type="number" min="1" step="1" required>
+                        <select class="settings-select" id="transfer-reminder-deadline-unit" name="transferReminderDeadlineUnit">
+                            <option value="day">天</option>
+                            <option value="week">周</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
                     <label class="settings-label" for="return-reminder-value">回库提醒时间</label>
                     <div class="settings-control">
                         <input class="settings-input" id="return-reminder-value" name="returnReminderValue" type="number" min="1" step="1" required>

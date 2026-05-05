@@ -7,11 +7,11 @@
 - 已完成商品导入、库存导入、三类提醒列表、状态流转、推后提醒、周统计纯函数和周统计 workflow。
 - 已完成业务参数设置入口：
   - 页面提醒列表切换区域右侧展示 `参数设置` 按钮。
-  - 设置弹窗支持配置上新/调货/回库首次提醒时间，单位可选天/周。
+  - 设置弹窗支持配置上新/调货/回库首次提醒时间和调货提醒截止时间，单位可选天/周。
   - 设置弹窗支持配置调货/回库最大推后次数。
   - 设置保存到 IndexedDB `settings` 表，固定记录主键为 `reminder-settings`。
 - 已完成配置驱动提醒规则：
-  - 默认值为上新 3 周、调货 3 周、回库 6 周、调货最大推后 2 次、回库最大推后 2 次。
+  - 默认值为上新 3 周、调货 3 周、调货截止 6 周、回库 6 周、调货最大推后 2 次、回库最大推后 2 次。
   - 页面列表过滤、列表排序、按钮显隐、状态流转校验和周统计都读取同一套参数。
   - 已推后的 `*RemindTime` 保持绝对时间，不因参数修改而重算。
 - 最近一次验证已通过：
@@ -30,7 +30,7 @@ pnpm run build:pages
 - 上新、调货、回库必须在同一个事务中校验当前 `status`，并同时更新新状态和对应时间字段。
 - 所有 `*RemindCount` 为空时按 0 处理。
 - 周统计中的“待处理提醒商品数”按统计周期结束时间计算，不按统计任务实际执行时间计算。
-- 上新/调货/回库首次提醒时间和调货/回库最大推后次数由 `settings` 表中的参数设置驱动；没有设置记录时使用默认值。
+- 上新/调货/回库首次提醒时间、调货提醒截止时间和调货/回库最大推后次数由 `settings` 表中的参数设置驱动；没有设置记录时使用默认值。
 - 上新推后提醒间隔固定 3 天，调货/回库推后提醒间隔固定 7 天，当前不做参数化。
 
 ## 阶段 1：统一数据模型和数据库 schema
@@ -69,6 +69,8 @@ pnpm run build:pages
   - `listingReminderUnit`
   - `transferReminderDays`
   - `transferReminderUnit`
+  - `transferReminderDeadlineDays`
+  - `transferReminderDeadlineUnit`
   - `returnReminderDays`
   - `returnReminderUnit`
   - `maxTransferPostponeCount`
@@ -180,6 +182,7 @@ pnpm run build:pages
 - 调货提醒规则：
   - `status === "listed"`
   - `listedTime` 不为空
+  - `now - listedTime <= settings.transferReminderDeadlineDays`
   - `transferRemindTime` 为空时：`now - listedTime >= settings.transferReminderDays`
   - `transferRemindTime` 不为空时：`transferRemindTime <= now`
 - 回库提醒规则：
@@ -245,6 +248,7 @@ pnpm run build:pages
 - 参数设置弹窗包含：
   - 上新提醒时间，默认 3 周，单位可切换为天/周。
   - 调货提醒时间，默认 3 周，单位可切换为天/周。
+  - 调货提醒截止时间，默认 6 周，单位可切换为天/周。
   - 回库提醒时间，默认 6 周，单位可切换为天/周。
   - 调货提醒最大推后次数，默认 2 次。
   - 回库提醒最大推后次数，默认 2 次。
@@ -252,6 +256,7 @@ pnpm run build:pages
   - 提醒时间必须为正整数。
   - 最大推后次数必须为非负整数，允许 0。
   - 时间按天保存，单位用于页面回显。
+  - 调货提醒截止时间必须大于调货提醒时间。
   - 保存后关闭弹窗并刷新三类列表数量和当前列表内容。
 - 调货提醒列表不显示 `回库` 按钮；满足回库条件的商品通过回库提醒列表处理。
 - 事件绑定使用 `data-barcode`，不要依赖不稳定的自增 `id`。

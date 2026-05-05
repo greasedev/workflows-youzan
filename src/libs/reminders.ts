@@ -26,6 +26,10 @@ export function getTransferThresholdSeconds(settings: ReminderSettings): number 
   return settings.transferReminderDays * SECONDS_PER_DAY;
 }
 
+export function getTransferDeadlineSeconds(settings: ReminderSettings): number {
+  return settings.transferReminderDeadlineDays * SECONDS_PER_DAY;
+}
+
 export function getReturnThresholdSeconds(settings: ReminderSettings): number {
   return settings.returnReminderDays * SECONDS_PER_DAY;
 }
@@ -50,6 +54,8 @@ export function isInTransferReminder(
   settings = DEFAULT_REMINDER_SETTINGS,
 ): boolean {
   if (product.status !== "listed" || !hasTimestamp(product.listedTime)) return false;
+
+  if (now - product.listedTime > getTransferDeadlineSeconds(settings)) return false;
 
   if (hasTimestamp(product.transferRemindTime)) {
     return product.transferRemindTime <= now;

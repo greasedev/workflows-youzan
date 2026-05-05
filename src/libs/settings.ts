@@ -11,6 +11,8 @@ export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
   listingReminderUnit: "week",
   transferReminderDays: 21,
   transferReminderUnit: "week",
+  transferReminderDeadlineDays: 42,
+  transferReminderDeadlineUnit: "week",
   returnReminderDays: 42,
   returnReminderUnit: "week",
   maxTransferPostponeCount: 2,
@@ -46,6 +48,13 @@ export function normalizeReminderSettings(value: Partial<ReminderSettings> | und
     transferReminderUnit: isReminderTimeUnit(value?.transferReminderUnit)
       ? value.transferReminderUnit
       : DEFAULT_REMINDER_SETTINGS.transferReminderUnit,
+    transferReminderDeadlineDays: normalizePositiveInteger(
+      value?.transferReminderDeadlineDays,
+      DEFAULT_REMINDER_SETTINGS.transferReminderDeadlineDays,
+    ),
+    transferReminderDeadlineUnit: isReminderTimeUnit(value?.transferReminderDeadlineUnit)
+      ? value.transferReminderDeadlineUnit
+      : DEFAULT_REMINDER_SETTINGS.transferReminderDeadlineUnit,
     returnReminderDays: normalizePositiveInteger(
       value?.returnReminderDays,
       DEFAULT_REMINDER_SETTINGS.returnReminderDays,

@@ -18,9 +18,6 @@ import {
 } from "../libs/product_actions";
 import {
   getCurrentTimestamp,
-  getListingThresholdSeconds,
-  getReturnThresholdSeconds,
-  getTransferThresholdSeconds,
   isInListingReminder,
   isInReturnReminder,
   isInTransferReminder,
@@ -474,6 +471,14 @@ function fillSettingsForm(settings: ReminderSettings): void {
     convertDaysToDisplayValue(settings.transferReminderDays, settings.transferReminderUnit),
   );
   getSelectElement("transfer-reminder-unit").value = settings.transferReminderUnit;
+  getInputElement("transfer-reminder-deadline-value").value = String(
+    convertDaysToDisplayValue(
+      settings.transferReminderDeadlineDays,
+      settings.transferReminderDeadlineUnit,
+    ),
+  );
+  getSelectElement("transfer-reminder-deadline-unit").value =
+    settings.transferReminderDeadlineUnit;
   getInputElement("return-reminder-value").value = String(
     convertDaysToDisplayValue(settings.returnReminderDays, settings.returnReminderUnit),
   );
@@ -485,7 +490,20 @@ function fillSettingsForm(settings: ReminderSettings): void {
 function readSettingsForm(): ReminderSettings {
   const listingReminderUnit = getUnitValue("listing-reminder-unit");
   const transferReminderUnit = getUnitValue("transfer-reminder-unit");
+  const transferReminderDeadlineUnit = getUnitValue("transfer-reminder-deadline-unit");
   const returnReminderUnit = getUnitValue("return-reminder-unit");
+  const transferReminderDays = convertValueToDays(
+    getIntegerInputValue("transfer-reminder-value", "调货提醒时间", 1),
+    transferReminderUnit,
+  );
+  const transferReminderDeadlineDays = convertValueToDays(
+    getIntegerInputValue("transfer-reminder-deadline-value", "调货提醒截止时间", 1),
+    transferReminderDeadlineUnit,
+  );
+
+  if (transferReminderDeadlineDays <= transferReminderDays) {
+    throw new Error("调货提醒截止时间必须大于调货提醒时间");
+  }
 
   return {
     id: reminderSettings.id,
@@ -494,11 +512,10 @@ function readSettingsForm(): ReminderSettings {
       listingReminderUnit,
     ),
     listingReminderUnit,
-    transferReminderDays: convertValueToDays(
-      getIntegerInputValue("transfer-reminder-value", "调货提醒时间", 1),
-      transferReminderUnit,
-    ),
+    transferReminderDays,
     transferReminderUnit,
+    transferReminderDeadlineDays,
+    transferReminderDeadlineUnit,
     returnReminderDays: convertValueToDays(
       getIntegerInputValue("return-reminder-value", "回库提醒时间", 1),
       returnReminderUnit,

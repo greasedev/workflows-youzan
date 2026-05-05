@@ -45,6 +45,8 @@ export interface ReminderSettings {
   listingReminderUnit: ReminderTimeUnit; // 上新提醒时间在页面中的展示单位，默认 week
   transferReminderDays: number; // 调货提醒时间，按天保存，默认 21
   transferReminderUnit: ReminderTimeUnit; // 调货提醒时间在页面中的展示单位，默认 week
+  transferReminderDeadlineDays: number; // 调货提醒截止时间，按天保存，默认 42
+  transferReminderDeadlineUnit: ReminderTimeUnit; // 调货提醒截止时间在页面中的展示单位，默认 week
   returnReminderDays: number; // 回库提醒时间，按天保存，默认 42
   returnReminderUnit: ReminderTimeUnit; // 回库提醒时间在页面中的展示单位，默认 week
   maxTransferPostponeCount: number; // 调货提醒最大推后次数，默认 2
@@ -59,11 +61,13 @@ export interface ReminderSettings {
 - 可设置参数：
   - 上新提醒时间，默认 3 周，单位可切换为天/周。
   - 调货提醒时间，默认 3 周，单位可切换为天/周。
+  - 调货提醒截止时间，默认 6 周，单位可切换为天/周。
   - 回库提醒时间，默认 6 周，单位可切换为天/周。
   - 调货提醒最大推后次数，默认 2 次。
   - 回库提醒最大推后次数，默认 2 次。
 - 提醒时间在业务计算中按天保存；单位只用于页面回显。
 - 提醒时间必须为正整数；最大推后次数必须为非负整数，允许设置为 0。
+- 调货提醒截止时间必须大于调货提醒时间。
 - 参数保存到 `settings` 表，固定记录主键为 `reminder-settings`；没有保存记录时使用默认值。
 - 修改参数后，三类提醒列表和周统计都按最新参数计算。
 - 已经存在的 `listingRemindTime`、`transferRemindTime`、`returnRemindTime` 是绝对提醒时间，参数修改后不重算。
@@ -135,8 +139,10 @@ export interface ReminderSettings {
 
 ### 过滤条件
 
-- `transferRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的调货提醒时间，且 `status` 字段为 `listed`。
-- `transferRemindTime` 字段不为空，且 `listedTime` 字段不为空，且 `transferRemindTime` 字段比当前时间早，且 `status` 字段为 `listed`。
+- `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 <= 参数设置中的调货提醒截止时间，且满足以下任一条件：
+  - `transferRemindTime` 字段为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的调货提醒时间，且 `status` 字段为 `listed`。
+  - `transferRemindTime` 字段不为空，且 `transferRemindTime` 字段比当前时间早，且 `status` 字段为 `listed`。
+- 当前时间 - `listedTime` 字段 > 参数设置中的调货提醒截止时间时，商品强制移出调货提醒列表；正好等于截止时间时仍可显示。
 
 ### 操作
 
