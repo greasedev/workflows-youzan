@@ -104,7 +104,6 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   if (existingProduct?.id != null) {
     await db.table(DB_TABLES.product).update(existingProduct.id, {
       name: product.name,
-      barcode: product.barcode,
       costPrice: product.costPrice,
     });
     return;
@@ -160,9 +159,20 @@ async function importProductReports(
 
 function mergeStockRows(stocks: Stock[]): Stock[] {
   const stocksByStore = new Map<string, Stock>();
+  const lastUpdatedTime = getCurrentTimestamp();
 
   stocks.forEach((stock) => {
-    stocksByStore.set(`${stock.barcode}\u0000${stock.store}`, stock);
+    const key = `${stock.barcode}\u0000${stock.store}`;
+    const existingStock = stocksByStore.get(key);
+    if (existingStock) {
+      existingStock.stock += stock.stock;
+      return;
+    }
+
+    stocksByStore.set(key, {
+      ...stock,
+      lastUpdatedTime,
+    });
   });
 
   return [...stocksByStore.values()];

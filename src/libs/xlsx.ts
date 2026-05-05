@@ -10,14 +10,14 @@ type XlsxRowFilter<T extends Product | Stock> = (row: T) => boolean;
 // Excel 列名到 Product 字段的映射
 const PRODUCT_COLUMN_MAPPING: Record<string, keyof Product> = {
   商品名称: "name",
-  规格条码: "barcode",
+  商品条码: "barcode",
   零售价: "costPrice",
   创建时间: "createdTime",
 };
 
 // Excel 列名到 Stock 字段的映射
 const STOCK_COLUMN_MAPPING: Record<string, keyof Stock> = {
-  "商品/规格条码": "barcode",
+  "商品条码(SPU)": "barcode",
   "门店/仓库": "store",
   实物库存: "stock",
 };

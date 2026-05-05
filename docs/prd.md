@@ -7,7 +7,7 @@ type ProductStatus = "pending" | "listed" | "transferred" | "returned";
 export interface Product {
   id?: number; // 数据库自增主键（可选，仅在数据库记录中存在）
   name: string; // 商品名称
-  barcode: string; // 商品规格条码
+  barcode: string; // 商品条码
   costPrice: number; // 商品零售价
   status: ProductStatus; // 商品状态
   createdTime: number; // 建档时间，秒时间戳
@@ -28,7 +28,7 @@ export interface Product {
 ```typescript
 export interface Stock {
   id?: number; // 数据库自增主键（可选，仅在数据库记录中存在）
-  barcode: string; // 商品规格条码
+  barcode: string; // 商品条码
   store: string; // 库存门店
   stock: number; // 库存数量
   lastUpdatedTime: number; // 最后更新时间，秒时间戳
@@ -93,14 +93,14 @@ export interface ReminderSettings {
 ### 库存导入
 
 - 库存报表字段映射：
-  - 商品/规格条码 -> `barcode`
+  - 商品条码(SPU) / 商品条码 -> `barcode`
   - 门店/仓库 -> `store`
   - 实物库存 -> `stock`
 - 只导入 `barcode` 存在且 `stock > 0` 的库存记录。
 - 库存数据是全量快照。
 - 有新库存报表时，先解析所有新库存报表；解析成功后再清空并写入 `stock` 表。
 - 没有新库存报表时，保留旧库存。
-- 同一批库存数据中相同 `barcode + store` 只保留一条记录。
+- 库存按商品条码和门店存储；同一批库存数据中相同 `barcode + store` 聚合为一条记录，库存数量为同一商品不同规格在同一门店的库存总和。
 
 ### 报表去重
 
