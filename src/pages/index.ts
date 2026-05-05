@@ -512,6 +512,10 @@ function fillSettingsForm(settings: ReminderSettings): void {
     convertDaysToDisplayValue(settings.returnReminderDays, settings.returnReminderUnit),
   );
   getSelectElement("return-reminder-unit").value = settings.returnReminderUnit;
+  getInputElement("force-return-value").value = String(
+    convertDaysToDisplayValue(settings.forceReturnDays, settings.forceReturnUnit),
+  );
+  getSelectElement("force-return-unit").value = settings.forceReturnUnit;
   getInputElement("transfer-postpone-count").value = String(settings.maxTransferPostponeCount);
   getInputElement("return-postpone-count").value = String(settings.maxReturnPostponeCount);
 }
@@ -521,6 +525,7 @@ function readSettingsForm(): ReminderSettings {
   const transferReminderUnit = getUnitValue("transfer-reminder-unit");
   const transferReminderDeadlineUnit = getUnitValue("transfer-reminder-deadline-unit");
   const returnReminderUnit = getUnitValue("return-reminder-unit");
+  const forceReturnUnit = getUnitValue("force-return-unit");
   const transferReminderDays = convertValueToDays(
     getIntegerInputValue("transfer-reminder-value", "调货提醒时间", 1),
     transferReminderUnit,
@@ -534,6 +539,19 @@ function readSettingsForm(): ReminderSettings {
     throw new Error("调货提醒截止时间必须大于调货提醒时间");
   }
 
+  const returnReminderDays = convertValueToDays(
+    getIntegerInputValue("return-reminder-value", "回库提醒时间", 1),
+    returnReminderUnit,
+  );
+  const forceReturnDays = convertValueToDays(
+    getIntegerInputValue("force-return-value", "强制回库时间", 1),
+    forceReturnUnit,
+  );
+
+  if (forceReturnDays <= returnReminderDays) {
+    throw new Error("强制回库时间必须大于回库提醒时间");
+  }
+
   return {
     id: reminderSettings.id,
     listingReminderDays: convertValueToDays(
@@ -545,11 +563,10 @@ function readSettingsForm(): ReminderSettings {
     transferReminderUnit,
     transferReminderDeadlineDays,
     transferReminderDeadlineUnit,
-    returnReminderDays: convertValueToDays(
-      getIntegerInputValue("return-reminder-value", "回库提醒时间", 1),
-      returnReminderUnit,
-    ),
+    returnReminderDays,
     returnReminderUnit,
+    forceReturnDays,
+    forceReturnUnit,
     maxTransferPostponeCount: getIntegerInputValue(
       "transfer-postpone-count",
       "调货提醒最大推后次数",

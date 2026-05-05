@@ -109,6 +109,16 @@
                     </div>
                 </div>
                 <div class="settings-row">
+                    <label class="settings-label" for="force-return-value">强制回库时间</label>
+                    <div class="settings-control">
+                        <input class="settings-input" id="force-return-value" name="forceReturnValue" type="number" min="1" step="1" required>
+                        <select class="settings-select" id="force-return-unit" name="forceReturnUnit">
+                            <option value="day">天</option>
+                            <option value="week">周</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-row">
                     <label class="settings-label" for="transfer-postpone-count">调货提醒最大推后次数</label>
                     <input class="settings-input settings-count-input" id="transfer-postpone-count" name="transferPostponeCount" type="number" min="0" step="1" required>
                 </div>

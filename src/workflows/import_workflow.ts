@@ -13,9 +13,10 @@
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis, type ExecutionResult } from "../api";
 import { DB_TABLES, initDB } from "../libs/db";
-import { getCurrentTimestamp } from "../libs/reminders";
+import { getCurrentTimestamp, SECONDS_PER_DAY } from "../libs/reminders";
+import { loadReminderSettings } from "../libs/settings";
 import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
-import type { Product, Stock } from "../models/types";
+import type { Product, ReminderSettings, Stock } from "../models/types";
 
 type ReportType = "product" | "stock";
 
@@ -34,6 +35,12 @@ interface ReportUrlScan {
 interface ParsedStockReport {
   url: string;
   stocks: Stock[];
+}
+
+interface ImportWorkflowData {
+  product: ImportStats;
+  stock: ImportStats;
+  forceReturnCount: number;
 }
 
 function createImportStats(reportType: ReportType): ImportStats {
@@ -157,6 +164,36 @@ async function importProductReports(
   return stats;
 }
 
+async function forceReturnOverdueProducts(
+  db: any,
+  settings: ReminderSettings,
+  now = getCurrentTimestamp(),
+): Promise<number> {
+  let forceReturnCount = 0;
+  const thresholdSeconds = settings.forceReturnDays * SECONDS_PER_DAY;
+
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
+    const products = (await db
+      .table(DB_TABLES.product)
+      .where("status")
+      .anyOf(["listed", "transferred"])
+      .toArray()) as Product[];
+
+    for (const product of products) {
+      if (product.id == null || product.listedTime == null) continue;
+      if (now - product.listedTime <= thresholdSeconds) continue;
+
+      await db.table(DB_TABLES.product).update(product.id, {
+        status: "returned",
+        returnedTime: now,
+      });
+      forceReturnCount += 1;
+    }
+  });
+
+  return forceReturnCount;
+}
+
 function mergeStockRows(stocks: Stock[]): Stock[] {
   const stocksByStore = new Map<string, Stock>();
   const lastUpdatedTime = getCurrentTimestamp();
@@ -237,13 +274,21 @@ export async function execute(context: WorkflowContext) {
     const stockReportResult = await apis.get_stock_report();
     const stockStats = await importStockReports(db, stockReportResult);
 
+    const settings = await loadReminderSettings(db);
+    const forceReturnCount = await forceReturnOverdueProducts(
+      db,
+      settings,
+      getCurrentTimestamp(),
+    );
+
     return {
       success: true,
       message: "Workflow completed successfully",
       data: {
         product: productStats,
         stock: stockStats,
-      },
+        forceReturnCount,
+      } satisfies ImportWorkflowData,
     };
   } catch (error) {
     console.error("Workflow error:", error);

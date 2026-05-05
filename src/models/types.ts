@@ -70,6 +70,8 @@ export interface ReminderSettings {
   transferReminderDeadlineUnit: ReminderTimeUnit;
   returnReminderDays: number;
   returnReminderUnit: ReminderTimeUnit;
+  forceReturnDays: number;
+  forceReturnUnit: ReminderTimeUnit;
   maxTransferPostponeCount: number;
   maxReturnPostponeCount: number;
 }
