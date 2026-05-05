@@ -135,7 +135,7 @@ export interface ReminderSettings {
 - 门店库存
 - 操作
 
-`门店库存` 按当前商品 `barcode` 查询库存，以“门店名 + 库存数”多行展示；无库存时显示 `-`。
+`门店库存` 按当前商品 `barcode` 查询库存，以“门店名 + 库存数”多行展示；页面只展示 `stock > 0` 的库存记录。
 
 ### 过滤条件
 
@@ -143,6 +143,7 @@ export interface ReminderSettings {
   - `transferRemindTime` 字段为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的调货提醒时间，且 `status` 字段为 `listed`。
   - `transferRemindTime` 字段不为空，且 `transferRemindTime` 字段比当前时间早，且 `status` 字段为 `listed`。
 - 当前时间 - `listedTime` 字段 > 参数设置中的调货提醒截止时间时，商品强制移出调货提醒列表；正好等于截止时间时仍可显示。
+- 当前库存快照中存在同 `barcode` 且 `stock > 0` 的库存记录；无正库存记录时不显示在调货提醒列表中。
 
 ### 操作
 
@@ -165,6 +166,7 @@ export interface ReminderSettings {
 
 - `returnRemindTime` 字段为空，且 `listedTime` 字段不为空，且 当前时间 - `listedTime` 字段 >= 参数设置中的回库提醒时间，且 `status` 字段为 `listed` 或 `transferred`。
 - `returnRemindTime` 字段不为空，且 `listedTime` 字段不为空，且 `returnRemindTime` 字段比当前时间早，且 `status` 字段为 `listed` 或 `transferred`。
+- 当前库存快照中存在同 `barcode` 且 `stock > 0` 的库存记录；无正库存记录时不显示在回库提醒列表中。
 
 ### 操作
 

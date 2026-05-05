@@ -5,6 +5,9 @@
 ## 当前开发进展
 
 - 已完成商品导入、库存导入、三类提醒列表、状态流转、推后提醒、周统计纯函数和周统计 workflow。
+- 已完成调货/回库提醒列表正库存展示门槛：
+  - 调货/回库页面列表和 tab 数量只包含当前库存快照中存在同 `barcode` 且 `stock > 0` 的商品。
+  - 该规则只影响页面列表和数量，不改变周统计和状态流转动作函数。
 - 已完成业务参数设置入口：
   - 页面提醒列表切换区域右侧展示 `参数设置` 按钮。
   - 设置弹窗支持配置上新/调货/回库首次提醒时间和调货提醒截止时间，单位可选天/周。
@@ -185,11 +188,13 @@ pnpm run build:pages
   - `now - listedTime <= settings.transferReminderDeadlineDays`
   - `transferRemindTime` 为空时：`now - listedTime >= settings.transferReminderDays`
   - `transferRemindTime` 不为空时：`transferRemindTime <= now`
+  - 页面列表额外要求当前库存快照中存在同 `barcode` 且 `stock > 0` 的库存记录
 - 回库提醒规则：
   - `status === "listed" || status === "transferred"`
   - `listedTime` 不为空
   - `returnRemindTime` 为空时：`now - listedTime >= settings.returnReminderDays`
   - `returnRemindTime` 不为空时：`returnRemindTime <= now`
+  - 页面列表额外要求当前库存快照中存在同 `barcode` 且 `stock > 0` 的库存记录
 - 将一天、一周、默认 21 天、默认 42 天等常量或默认设置集中定义。
 
 验收：
@@ -268,6 +273,7 @@ pnpm run build:pages
 - 三个列表可以正常切换，数量随数据变化更新。
 - 三个提醒列表均不展示 `零售价`。
 - 调货/回库列表按需展示门店库存，不一次性读取全部库存。
+- 调货/回库列表和对应 tab 数量只包含有正库存的商品。
 - 同一商品多门店库存可以在同一单元格内多行展示。
 - 上新后商品离开上新列表，并在满足调货条件后进入调货列表。
 - 调货后商品离开调货列表，但满足参数设置中的回库提醒时间规则时仍可进入回库列表。
@@ -380,6 +386,7 @@ pnpm run build:pages
 - 回库后是否从所有提醒列表消失。
 - 上新、调货、回库列表是否均不展示 `零售价`。
 - 调货/回库列表是否展示门店库存。
+- 调货/回库列表是否过滤掉无正库存商品。
 - `stock <= 0` 是否不导入、不展示。
 - 没有新库存报表时旧库存是否保留。
 - 有新库存报表时旧库存是否被新快照替换。

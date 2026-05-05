@@ -155,6 +155,28 @@ function getDisplayProductsByList(allProducts: Product[], now: number): DisplayP
   };
 }
 
+function hasPositiveStock(stocksByBarcode: Map<string, Stock[]>, barcode: string): boolean {
+  return (stocksByBarcode.get(barcode) ?? []).some((stock) => stock.stock > 0);
+}
+
+function filterProductsWithPositiveStock(
+  products: Product[],
+  stocksByBarcode: Map<string, Stock[]>,
+): Product[] {
+  return products.filter((product) => hasPositiveStock(stocksByBarcode, product.barcode));
+}
+
+function filterDisplayProductsByStock(
+  displayProductsByList: DisplayProductsByList,
+  stocksByBarcode: Map<string, Stock[]>,
+): DisplayProductsByList {
+  return {
+    listing: displayProductsByList.listing,
+    transfer: filterProductsWithPositiveStock(displayProductsByList.transfer, stocksByBarcode),
+    return: filterProductsWithPositiveStock(displayProductsByList.return, stocksByBarcode),
+  };
+}
+
 function getEmptyText(listType: ProductListType): string {
   if (listType === "transfer") return "暂无待调货商品";
   if (listType === "return") return "暂无待回库商品";
@@ -352,12 +374,19 @@ async function renderProducts(): Promise<void> {
 
   const now = getCurrentTimestamp();
   const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
-  const displayProductsByList = getDisplayProductsByList(allProducts, now);
+  const candidateProductsByList = getDisplayProductsByList(allProducts, now);
+  const stockCandidates = [
+    ...candidateProductsByList.transfer,
+    ...candidateProductsByList.return,
+  ];
+  const stocksByBarcode = await getStocksByBarcodeForList(stockCandidates);
+  const displayProductsByList = filterDisplayProductsByStock(
+    candidateProductsByList,
+    stocksByBarcode,
+  );
   updateTabCounts(displayProductsByList);
   const displayProducts = displayProductsByList[activeListType];
-  const stocksByBarcode = shouldLoadStocks(activeListType)
-      ? await getStocksByBarcodeForList(displayProducts)
-      : undefined;
+  const rowStocksByBarcode = shouldLoadStocks(activeListType) ? stocksByBarcode : undefined;
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
@@ -376,7 +405,7 @@ async function renderProducts(): Promise<void> {
   }
 
   tbody.innerHTML = displayProducts
-    .map((product: Product) => renderProductRow(product, activeListType, stocksByBarcode))
+    .map((product: Product) => renderProductRow(product, activeListType, rowStocksByBarcode))
     .join("");
   bindProductEvents();
 }
