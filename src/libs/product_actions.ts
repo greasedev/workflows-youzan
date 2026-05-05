@@ -221,3 +221,29 @@ export async function postponeReturnReminder(
 
   return updatedProduct!;
 }
+
+export async function markReturnedProductsExported(
+  db: ProductDb,
+  barcodes: string[],
+): Promise<number> {
+  const uniqueBarcodes = [...new Set(barcodes.filter(Boolean))];
+  if (uniqueBarcodes.length === 0) {
+    throw new ProductActionError("没有可标记为已导出的商品");
+  }
+
+  let exportedCount = 0;
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
+    for (const barcode of uniqueBarcodes) {
+      const product = await getProductByBarcode(db, barcode);
+      if (product.status !== "returned") continue;
+      await updateProduct(db, product, { status: "exported" });
+      exportedCount += 1;
+    }
+  });
+
+  if (exportedCount === 0) {
+    throw new ProductActionError("没有仍处于已回库状态的商品可标记为已导出");
+  }
+
+  return exportedCount;
+}

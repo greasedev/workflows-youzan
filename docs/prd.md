@@ -3,7 +3,7 @@
 ## 商品数据结构
 
 ```typescript
-type ProductStatus = "pending" | "listed" | "transferred" | "returned";
+type ProductStatus = "pending" | "listed" | "transferred" | "returned" | "exported";
 export interface Product {
   id?: number; // 数据库自增主键（可选，仅在数据库记录中存在）
   name: string; // 商品名称
@@ -196,7 +196,11 @@ export interface ReminderSettings {
 
 ### 操作
 
-- 回库导出列表仅用于查看，不展示操作列，不提供状态流转或推后提醒操作。
+- 导出Excel：点击 `导出Excel` 按钮后，按门店分别生成 Excel 文件，文件名格式为 `XXXX_回库列表_YYYYMMDD.xlsx`，其中 `XXXX` 为门店名称，`YYYYMMDD` 为操作当天日期。
+- 每个门店文件只包含该门店的回库商品库存记录；同一商品存在多个门店正库存时，分别写入对应门店文件。
+- 导出的 Excel 表头为：门店名称、商品名称、商品条码、回库数量、操作日期。
+- `回库数量` 使用商品在当前门店的正库存数量；`操作日期` 使用导出当天日期。
+- 文件下载触发后，用户确认文件已成功保存时，参与导出的商品 `status` 更新为 `exported`；取消确认时不更新状态。
 
 ## 库存查询列表
 
@@ -233,6 +237,7 @@ export interface ReminderSettings {
   - `pending` 只能在进入 `上新提醒列表` 后，通过 `上新` 操作变更为 `listed`。
   - `listed` 只能在进入 `调货提醒列表` 后，通过 `调货` 操作变更为 `transferred`。
   - `listed` 或 `transferred` 只能在进入 `回库提醒列表` 后，通过 `回库` 操作变更为 `returned`。
+  - `returned` 只能在 `回库导出列表` 生成 Excel 且用户确认文件已成功保存后，变更为 `exported`。
 - 不存在绕过提醒列表直接手动修改状态的入口；导入流程只创建或更新基础商品信息，但会按强制回库规则自动将超期 `listed` 或 `transferred` 商品变更为 `returned`；新商品导入时 `status` 初始化为 `pending`，已有商品导入更新基础信息时不改变业务状态，同时不得修改 `createdTime`，该字段以首次导入时的值为准。
 - 所有 `*RemindCount` 字段为空时按 0 处理。
 
@@ -258,7 +263,7 @@ A：不是，按业务规则，调货和回库提醒的基准时间都是 listed
 A：可以。
 
 ### Q：商品回库后，是否还会出现在任何提醒列表中？
-A：商品回库后，`status` 字段变更为 `returned`，不再出现在任何提醒列表中。
+A：商品回库后，`status` 字段变更为 `returned`，不再出现在上新、调货、回库提醒列表中；如果当前仍有正库存，会出现在 `回库导出列表` 中。导出确认后状态变更为 `exported`，不再出现在 `回库导出列表` 中。
 
 ### Q: 上新推后提醒是 3 天，调货和回库推后提醒是 7 天。这个差异是业务规则还是需要统一？
 A：这是业务规则，不能统一。本次参数设置只配置首次进入提醒列表的时间和调货/回库最大推后次数，不配置推后提醒间隔。

@@ -109,7 +109,8 @@ body {
     background: var(--primary);
     color: white;
 }
-.stock-query-panel {
+.stock-query-panel,
+.return-export-panel {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -122,6 +123,12 @@ body {
     box-shadow: var(--shadow-sm);
 }
 .stock-query-panel[hidden] {
+    display: none;
+}
+.return-export-panel {
+    justify-content: flex-end;
+}
+.return-export-panel[hidden] {
     display: none;
 }
 .stock-query-fields,
@@ -464,7 +471,8 @@ tr:last-child td {
 }
 @media (max-width: 768px) {
     .list-toolbar,
-    .stock-query-panel {
+    .stock-query-panel,
+    .return-export-panel {
         align-items: stretch;
         flex-direction: column;
     }

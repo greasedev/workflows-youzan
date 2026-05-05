@@ -1,5 +1,5 @@
 // 商品状态枚举
-export type ProductStatus = "pending" | "listed" | "transferred" | "returned";
+export type ProductStatus = "pending" | "listed" | "transferred" | "returned" | "exported";
 
 // 商品数据接口
 export interface Product {

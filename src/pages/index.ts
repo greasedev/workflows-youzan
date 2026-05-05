@@ -4,10 +4,12 @@
  */
 
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
+import * as XLSX from "xlsx";
 import { Product, DurationResult, Stock, ReminderSettings, ReminderTimeUnit } from "../models/types";
 import { formatDate, formatOptionalDate } from "../libs/date";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
+  markReturnedProductsExported,
   markListed,
   markReturned,
   markTransferred,
@@ -59,6 +61,12 @@ interface StockQueryRange {
   endDate: string;
   startTime: number;
   endTime: number;
+}
+
+interface ReturnExportRow {
+  store: string;
+  product: Product;
+  quantity: number;
 }
 
 const LIST_TYPES: ProductListType[] = [
@@ -154,10 +162,27 @@ function escapeAttribute(value: string): string {
   return escapeHtml(value);
 }
 
+function getTodayDateText(): string {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayFilenameDateText(): string {
+  return getTodayDateText().replace(/-/g, "");
+}
+
+function sanitizeFilenamePart(value: string): string {
+  return value.replace(/[\\/:*?"<>|]/g, "_").trim() || "未知门店";
+}
+
 function getStatusText(product: Product): string {
   if (product.status === "listed") return "已上新";
   if (product.status === "transferred") return "已调货";
   if (product.status === "returned") return "已回库";
+  if (product.status === "exported") return "已导出";
   return "待上新";
 }
 
@@ -275,6 +300,17 @@ function renderTableHead(listType: ProductListType): void {
   tableHead.innerHTML = TABLE_COLUMNS[listType]
     .map((column) => `<th style="width: ${column.width}px;">${column.title}</th>`)
     .join("");
+}
+
+function updateReturnExportPanel(displayProducts: Product[]): void {
+  const panel = document.getElementById("return-export-panel") as HTMLDivElement | null;
+  const exportBtn = document.getElementById("return-export-btn") as HTMLButtonElement | null;
+  if (panel) {
+    panel.hidden = activeListType !== "return-export";
+  }
+  if (exportBtn) {
+    exportBtn.disabled = activeListType !== "return-export" || displayProducts.length === 0;
+  }
 }
 
 function renderProductInfo(product: Product): string {
@@ -541,6 +577,7 @@ async function renderProducts(): Promise<void> {
   updateTabCounts(displayProductsByList);
   const displayProducts = displayProductsByList[activeListType];
   const rowStocksByBarcode = shouldLoadStocks(activeListType) ? stocksByBarcode : undefined;
+  updateReturnExportPanel(displayProducts);
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
@@ -676,6 +713,97 @@ async function handleStockQueryClear(): Promise<void> {
   getStockDateInput("stock-query-start-date").value = "";
   getStockDateInput("stock-query-end-date").value = "";
   await renderProducts();
+}
+
+function getReturnExportRows(
+  products: Product[],
+  stocksByBarcode: Map<string, Stock[]>,
+): ReturnExportRow[] {
+  return products.flatMap((product) =>
+    (stocksByBarcode.get(product.barcode) ?? [])
+      .filter((stock) => stock.stock > 0)
+      .map((stock) => ({
+        store: stock.store,
+        product,
+        quantity: stock.stock,
+      })),
+  );
+}
+
+function triggerWorkbookDownload(store: string, rows: ReturnExportRow[], operationDate: string): void {
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.json_to_sheet(
+    rows.map((row) => ({
+      门店名称: row.store,
+      商品名称: row.product.name,
+      商品条码: row.product.barcode,
+      回库数量: row.quantity,
+      操作日期: operationDate,
+    })),
+    {
+      header: ["门店名称", "商品名称", "商品条码", "回库数量", "操作日期"],
+    },
+  );
+  XLSX.utils.book_append_sheet(workbook, worksheet, "回库列表");
+
+  const fileData = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  const blob = new Blob([fileData], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${sanitizeFilenamePart(store)}_回库列表_${getTodayFilenameDateText()}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function handleReturnExport(): Promise<void> {
+  const now = getCurrentTimestamp();
+  const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
+  const candidateProductsByList = getDisplayProductsByList(allProducts, now);
+  const returnExportCandidates = candidateProductsByList["return-export"];
+  const stocksByBarcode = await getStocksByBarcodeForList(returnExportCandidates);
+  const returnExportProducts = filterProductsWithPositiveStock(
+    returnExportCandidates,
+    stocksByBarcode,
+  );
+
+  if (returnExportProducts.length === 0) {
+    showToast("暂无可导出的回库商品", "error");
+    await renderProducts();
+    return;
+  }
+
+  const exportRows = getReturnExportRows(returnExportProducts, stocksByBarcode);
+  if (exportRows.length === 0) {
+    showToast("暂无可导出的门店库存", "error");
+    await renderProducts();
+    return;
+  }
+
+  const rowsByStore = new Map<string, ReturnExportRow[]>();
+  exportRows.forEach((row) => {
+    rowsByStore.set(row.store, [...(rowsByStore.get(row.store) ?? []), row]);
+  });
+
+  const operationDate = getTodayDateText();
+  rowsByStore.forEach((rows, store) => {
+    triggerWorkbookDownload(store, rows, operationDate);
+  });
+
+  const exportedBarcodes = [...new Set(exportRows.map((row) => row.product.barcode))];
+  showModal(
+    "确认导出成功",
+    `已生成 ${rowsByStore.size} 个回库列表 Excel 文件。确认文件已成功保存后，将 ${exportedBarcodes.length} 个商品标记为已导出。`,
+    async () => {
+      const exportedCount = await markReturnedProductsExported(db, exportedBarcodes);
+      await renderProducts();
+      showToast(`已标记 ${exportedCount} 个商品为已导出`, "success");
+    },
+  );
 }
 
 function isReminderTimeUnit(value: string): value is ReminderTimeUnit {
@@ -1019,6 +1147,15 @@ function initEventListeners(): void {
   if (stockQueryClearBtn) {
     stockQueryClearBtn.addEventListener("click", () => {
       handleStockQueryClear().catch((error) => {
+        showToast(getErrorMessage(error), "error");
+      });
+    });
+  }
+
+  const returnExportBtn = document.getElementById("return-export-btn");
+  if (returnExportBtn) {
+    returnExportBtn.addEventListener("click", () => {
+      handleReturnExport().catch((error) => {
         showToast(getErrorMessage(error), "error");
       });
     });
