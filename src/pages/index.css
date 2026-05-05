@@ -130,6 +130,7 @@ body {
     gap: 12px;
 }
 .stock-query-fields {
+    align-items: center;
     flex-wrap: wrap;
 }
 .stock-query-actions {
@@ -137,11 +138,10 @@ body {
 }
 .stock-query-field {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    color: #444;
-    font-size: 13px;
-    font-weight: 500;
+}
+.stock-query-separator {
+    color: var(--text-secondary);
+    font-size: 14px;
 }
 .stock-query-input,
 .settings-input,
@@ -217,6 +217,11 @@ tr:last-child td {
     display: flex;
     align-items: center;
     gap: 12px;
+}
+.row-no {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
 }
 .product-name {
     color: var(--text-primary);

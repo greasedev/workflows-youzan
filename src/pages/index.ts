@@ -70,18 +70,21 @@ const LIST_TYPES: ProductListType[] = [
 ];
 const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
   listing: [
+    { title: "No.", width: 72 },
     { title: "商品信息", width: 240 },
     { title: "建档时间", width: 180 },
     { title: "建档时长", width: 140 },
     { title: "操作", width: 220 },
   ],
   transfer: [
+    { title: "No.", width: 72 },
     { title: "商品信息", width: 240 },
     { title: "上新时间", width: 180 },
     { title: "门店库存", width: 180 },
     { title: "操作", width: 220 },
   ],
   return: [
+    { title: "No.", width: 72 },
     { title: "商品信息", width: 240 },
     { title: "上新时间", width: 180 },
     { title: "当前状态", width: 140 },
@@ -89,12 +92,14 @@ const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
     { title: "操作", width: 220 },
   ],
   "return-export": [
+    { title: "No.", width: 72 },
     { title: "商品信息", width: 240 },
     { title: "上新时间", width: 180 },
     { title: "回库时间", width: 180 },
     { title: "门店库存", width: 180 },
   ],
   "stock-query": [
+    { title: "No.", width: 72 },
     { title: "商品信息", width: 240 },
     { title: "建档时间", width: 180 },
     { title: "当前状态", width: 140 },
@@ -283,6 +288,10 @@ function renderProductInfo(product: Product): string {
   `;
 }
 
+function renderRowNo(rowIndex: number): string {
+  return `<td class="row-no">${rowIndex + 1}</td>`;
+}
+
 function renderActionButton(
   action: ProductAction,
   barcode: string,
@@ -346,7 +355,11 @@ async function getStocksByBarcodeForList(
   }
 }
 
-function renderTransferRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+function renderTransferRow(
+  product: Product,
+  rowIndex: number,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
   const barcode = product.barcode;
   const actionButtons = [
     renderActionButton("mark-transferred", barcode, "调货", "primary"),
@@ -357,6 +370,7 @@ function renderTransferRow(product: Product, stocksByBarcode?: Map<string, Stock
 
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
+      ${renderRowNo(rowIndex)}
       <td>${renderProductInfo(product)}</td>
       <td>
         <div class="time-info">
@@ -371,7 +385,11 @@ function renderTransferRow(product: Product, stocksByBarcode?: Map<string, Stock
   `;
 }
 
-function renderReturnRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+function renderReturnRow(
+  product: Product,
+  rowIndex: number,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
   const barcode = product.barcode;
   const actionButtons = [
     renderActionButton("mark-returned", barcode, "回库", "primary"),
@@ -382,6 +400,7 @@ function renderReturnRow(product: Product, stocksByBarcode?: Map<string, Stock[]
 
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
+      ${renderRowNo(rowIndex)}
       <td>${renderProductInfo(product)}</td>
       <td>
         <div class="time-info">
@@ -401,11 +420,16 @@ function renderReturnRow(product: Product, stocksByBarcode?: Map<string, Stock[]
   `;
 }
 
-function renderReturnExportRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+function renderReturnExportRow(
+  product: Product,
+  rowIndex: number,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
   const barcode = product.barcode;
 
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
+      ${renderRowNo(rowIndex)}
       <td>${renderProductInfo(product)}</td>
       <td>
         <div class="time-info">
@@ -424,11 +448,16 @@ function renderReturnExportRow(product: Product, stocksByBarcode?: Map<string, S
   `;
 }
 
-function renderStockQueryRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+function renderStockQueryRow(
+  product: Product,
+  rowIndex: number,
+  stocksByBarcode?: Map<string, Stock[]>,
+): string {
   const barcode = product.barcode;
 
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
+      ${renderRowNo(rowIndex)}
       <td>${renderProductInfo(product)}</td>
       <td>
         <div class="time-info">
@@ -447,12 +476,13 @@ function renderStockQueryRow(product: Product, stocksByBarcode?: Map<string, Sto
   `;
 }
 
-function renderListingRow(product: Product): string {
+function renderListingRow(product: Product, rowIndex: number): string {
   const barcode = product.barcode;
   const duration = getDuration(product.createdTime, reminderSettings.listingReminderDays);
 
   return `
     <tr data-barcode="${escapeAttribute(barcode)}">
+      ${renderRowNo(rowIndex)}
       <td>${renderProductInfo(product)}</td>
       <td>
         <div class="time-info">
@@ -477,13 +507,14 @@ function renderListingRow(product: Product): string {
 function renderProductRow(
   product: Product,
   listType: ProductListType,
+  rowIndex: number,
   stocksByBarcode?: Map<string, Stock[]>,
 ): string {
-  if (listType === "transfer") return renderTransferRow(product, stocksByBarcode);
-  if (listType === "return") return renderReturnRow(product, stocksByBarcode);
-  if (listType === "return-export") return renderReturnExportRow(product, stocksByBarcode);
-  if (listType === "stock-query") return renderStockQueryRow(product, stocksByBarcode);
-  return renderListingRow(product);
+  if (listType === "transfer") return renderTransferRow(product, rowIndex, stocksByBarcode);
+  if (listType === "return") return renderReturnRow(product, rowIndex, stocksByBarcode);
+  if (listType === "return-export") return renderReturnExportRow(product, rowIndex, stocksByBarcode);
+  if (listType === "stock-query") return renderStockQueryRow(product, rowIndex, stocksByBarcode);
+  return renderListingRow(product, rowIndex);
 }
 
 async function renderProducts(): Promise<void> {
@@ -528,7 +559,9 @@ async function renderProducts(): Promise<void> {
   }
 
   tbody.innerHTML = displayProducts
-    .map((product: Product) => renderProductRow(product, activeListType, rowStocksByBarcode))
+    .map((product: Product, index: number) =>
+      renderProductRow(product, activeListType, index, rowStocksByBarcode),
+    )
     .join("");
   bindProductEvents();
 }
