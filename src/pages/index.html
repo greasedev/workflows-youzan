@@ -66,70 +66,82 @@
     <!-- 参数设置弹窗 -->
     <div class="modal" id="settings-modal">
         <div class="modal-content settings-modal-content">
-            <div class="modal-title">参数设置</div>
+            <div class="settings-modal-header">
+                <div>
+                    <div class="modal-title">参数设置</div>
+                    <div class="settings-modal-subtitle">配置提醒进入时间、截止时间和最大推后次数</div>
+                </div>
+            </div>
             <form class="settings-form" id="settings-form">
-                <div class="settings-row">
-                    <label class="settings-label" for="listing-reminder-value">上新提醒</label>
-                    <div class="settings-control">
-                        <span class="settings-label">距建档</span>
-                        <input class="settings-input" id="listing-reminder-value" name="listingReminderValue" type="number" min="1" step="1" required>
-                        <select class="settings-select" id="listing-reminder-unit" name="listingReminderUnit">
-                            <option value="day">天</option>
-                            <option value="week">周</option>
-                        </select>
+                <div class="settings-section">
+                    <div class="settings-section-title">提醒时间</div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="listing-reminder-value">上新提醒</label>
+                        <div class="settings-control">
+                            <span class="settings-prefix">距建档</span>
+                            <input class="settings-input" id="listing-reminder-value" name="listingReminderValue" type="number" min="1" step="1" required>
+                            <select class="settings-select" id="listing-reminder-unit" name="listingReminderUnit">
+                                <option value="day">天</option>
+                                <option value="week">周</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="transfer-reminder-value">调货提醒</label>
+                        <div class="settings-control">
+                            <span class="settings-prefix">距上新</span>
+                            <input class="settings-input" id="transfer-reminder-value" name="transferReminderValue" type="number" min="1" step="1" required>
+                            <select class="settings-select" id="transfer-reminder-unit" name="transferReminderUnit">
+                                <option value="day">天</option>
+                                <option value="week">周</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="transfer-reminder-deadline-value">调货提醒截止</label>
+                        <div class="settings-control">
+                            <span class="settings-prefix">距上新</span>
+                            <input class="settings-input" id="transfer-reminder-deadline-value" name="transferReminderDeadlineValue" type="number" min="1" step="1" required>
+                            <select class="settings-select" id="transfer-reminder-deadline-unit" name="transferReminderDeadlineUnit">
+                                <option value="day">天</option>
+                                <option value="week">周</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="return-reminder-value">回库提醒</label>
+                        <div class="settings-control">
+                            <span class="settings-prefix">距上新</span>
+                            <input class="settings-input" id="return-reminder-value" name="returnReminderValue" type="number" min="1" step="1" required>
+                            <select class="settings-select" id="return-reminder-unit" name="returnReminderUnit">
+                                <option value="day">天</option>
+                                <option value="week">周</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="force-return-value">强制回库</label>
+                        <div class="settings-control">
+                            <span class="settings-prefix">距上新</span>
+                            <input class="settings-input" id="force-return-value" name="forceReturnValue" type="number" min="1" step="1" required>
+                            <select class="settings-select" id="force-return-unit" name="forceReturnUnit">
+                                <option value="day">天</option>
+                                <option value="week">周</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="transfer-reminder-value">调货提醒</label>
-                    <div class="settings-control">
-                        <span class="settings-label">距上新</span>
-                        <input class="settings-input" id="transfer-reminder-value" name="transferReminderValue" type="number" min="1" step="1" required>
-                        <select class="settings-select" id="transfer-reminder-unit" name="transferReminderUnit">
-                            <option value="day">天</option>
-                            <option value="week">周</option>
-                        </select>
+
+                <div class="settings-section">
+                    <div class="settings-section-title">推后次数</div>
+                    <div class="settings-row">
+                        <label class="settings-label" for="transfer-postpone-count">调货提醒最大推后次数</label>
+                        <input class="settings-input settings-count-input" id="transfer-postpone-count" name="transferPostponeCount" type="number" min="0" step="1" required>
                     </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="transfer-reminder-deadline-value">调货提醒截止</label>
-                    <div class="settings-control">
-                        <span class="settings-label">距上新</span>
-                        <input class="settings-input" id="transfer-reminder-deadline-value" name="transferReminderDeadlineValue" type="number" min="1" step="1" required>
-                        <select class="settings-select" id="transfer-reminder-deadline-unit" name="transferReminderDeadlineUnit">
-                            <option value="day">天</option>
-                            <option value="week">周</option>
-                        </select>
+                    <div class="settings-row">
+                        <label class="settings-label" for="return-postpone-count">回库提醒最大推后次数</label>
+                        <input class="settings-input settings-count-input" id="return-postpone-count" name="returnPostponeCount" type="number" min="0" step="1" required>
                     </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="return-reminder-value">回库提醒</label>
-                    <div class="settings-control">
-                        <span class="settings-label">距上新</span>
-                        <input class="settings-input" id="return-reminder-value" name="returnReminderValue" type="number" min="1" step="1" required>
-                        <select class="settings-select" id="return-reminder-unit" name="returnReminderUnit">
-                            <option value="day">天</option>
-                            <option value="week">周</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="force-return-value">强制回库</label>
-                    <div class="settings-control">
-                        <span class="settings-label">距上新</span>
-                        <input class="settings-input" id="force-return-value" name="forceReturnValue" type="number" min="1" step="1" required>
-                        <select class="settings-select" id="force-return-unit" name="forceReturnUnit">
-                            <option value="day">天</option>
-                            <option value="week">周</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="transfer-postpone-count">调货提醒最大推后次数</label>
-                    <input class="settings-input settings-count-input" id="transfer-postpone-count" name="transferPostponeCount" type="number" min="0" step="1" required>
-                </div>
-                <div class="settings-row">
-                    <label class="settings-label" for="return-postpone-count">回库提醒最大推后次数</label>
-                    <input class="settings-input settings-count-input" id="return-postpone-count" name="returnPostponeCount" type="number" min="0" step="1" required>
                 </div>
                 <div class="modal-actions">
                     <button class="btn btn-secondary" id="settings-cancel-btn" type="button">取消</button>
