@@ -127,14 +127,11 @@ function getStatusText(product: Product): string {
   return "待上新";
 }
 
-function getReminderDueTime(product: Product, listType: ProductListType): number {
+function getSortTime(product: Product, listType: ProductListType): number {
   if (listType === "listing") {
-    return product.listingRemindTime ?? product.createdTime + getListingThresholdSeconds(reminderSettings);
+    return product.createdTime;
   }
-  if (listType === "transfer") {
-    return product.transferRemindTime ?? (product.listedTime ?? 0) + getTransferThresholdSeconds(reminderSettings);
-  }
-  return product.returnRemindTime ?? (product.listedTime ?? 0) + getReturnThresholdSeconds(reminderSettings);
+  return product.listedTime ?? 0;
 }
 
 function getDisplayProducts(
@@ -150,7 +147,7 @@ function getDisplayProducts(
 
   return allProducts
     .filter((product) => predicate(product, now, reminderSettings))
-    .sort((a, b) => getReminderDueTime(a, listType) - getReminderDueTime(b, listType));
+    .sort((a, b) => getSortTime(a, listType) - getSortTime(b, listType));
 }
 
 function getDisplayProductsByList(allProducts: Product[], now: number): DisplayProductsByList {
