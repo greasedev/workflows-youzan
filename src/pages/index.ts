@@ -39,7 +39,7 @@ declare global {
 const agent = new Agent(window.agentOptions || {});
 const db = initDB(agent);
 
-type ProductListType = "listing" | "transfer" | "return" | "return-export";
+type ProductListType = "listing" | "transfer" | "return" | "return-export" | "inventory-query";
 type ProductAction =
   | "mark-listed"
   | "postpone-listing"
@@ -54,7 +54,20 @@ interface TableColumn {
   width: number;
 }
 
-const LIST_TYPES: ProductListType[] = ["listing", "transfer", "return", "return-export"];
+interface InventoryQueryRange {
+  startDate: string;
+  endDate: string;
+  startTime: number;
+  endTime: number;
+}
+
+const LIST_TYPES: ProductListType[] = [
+  "listing",
+  "transfer",
+  "return",
+  "return-export",
+  "inventory-query",
+];
 const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
   listing: [
     { title: "商品信息", width: 240 },
@@ -81,13 +94,26 @@ const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
     { title: "回库时间", width: 180 },
     { title: "门店库存", width: 180 },
   ],
+  "inventory-query": [
+    { title: "商品信息", width: 240 },
+    { title: "建档时间", width: 180 },
+    { title: "当前状态", width: 140 },
+    { title: "门店库存", width: 180 },
+  ],
 };
 
 let activeListType: ProductListType = "listing";
 let reminderSettings: ReminderSettings = DEFAULT_REMINDER_SETTINGS;
+let inventoryQueryRange: InventoryQueryRange | null = null;
 
 function isProductListType(value: string | undefined): value is ProductListType {
-  return value === "listing" || value === "transfer" || value === "return" || value === "return-export";
+  return (
+    value === "listing" ||
+    value === "transfer" ||
+    value === "return" ||
+    value === "return-export" ||
+    value === "inventory-query"
+  );
 }
 
 /**
@@ -134,6 +160,9 @@ function getSortTime(product: Product, listType: ProductListType): number {
   if (listType === "listing") {
     return product.createdTime;
   }
+  if (listType === "inventory-query") {
+    return product.createdTime;
+  }
   if (listType === "return-export") {
     return product.returnedTime ?? product.listedTime ?? product.createdTime;
   }
@@ -148,6 +177,17 @@ function getDisplayProducts(
   if (listType === "return-export") {
     return allProducts
       .filter((product) => product.status === "returned")
+      .sort((a, b) => getSortTime(a, listType) - getSortTime(b, listType));
+  }
+  if (listType === "inventory-query") {
+    const queryRange = inventoryQueryRange;
+    if (!queryRange) return [];
+    return allProducts
+      .filter(
+        (product) =>
+          product.createdTime >= queryRange.startTime &&
+          product.createdTime <= queryRange.endTime,
+      )
       .sort((a, b) => getSortTime(a, listType) - getSortTime(b, listType));
   }
 
@@ -168,6 +208,7 @@ function getDisplayProductsByList(allProducts: Product[], now: number): DisplayP
     transfer: getDisplayProducts(allProducts, "transfer", now),
     return: getDisplayProducts(allProducts, "return", now),
     "return-export": getDisplayProducts(allProducts, "return-export", now),
+    "inventory-query": getDisplayProducts(allProducts, "inventory-query", now),
   };
 }
 
@@ -194,6 +235,10 @@ function filterDisplayProductsByStock(
       displayProductsByList["return-export"],
       stocksByBarcode,
     ),
+    "inventory-query": filterProductsWithPositiveStock(
+      displayProductsByList["inventory-query"],
+      stocksByBarcode,
+    ),
   };
 }
 
@@ -201,6 +246,7 @@ function getEmptyText(listType: ProductListType): string {
   if (listType === "transfer") return "暂无待调货商品";
   if (listType === "return") return "暂无待回库商品";
   if (listType === "return-export") return "暂无可导出的回库商品";
+  if (listType === "inventory-query") return "请选择建档时间范围查询库存商品";
   return "暂无待上新商品";
 }
 
@@ -209,7 +255,12 @@ function getTableColumnCount(listType: ProductListType): number {
 }
 
 function shouldLoadStocks(listType: ProductListType): boolean {
-  return listType === "transfer" || listType === "return" || listType === "return-export";
+  return (
+    listType === "transfer" ||
+    listType === "return" ||
+    listType === "return-export" ||
+    listType === "inventory-query"
+  );
 }
 
 function renderTableHead(listType: ProductListType): void {
@@ -373,6 +424,29 @@ function renderReturnExportRow(product: Product, stocksByBarcode?: Map<string, S
   `;
 }
 
+function renderInventoryQueryRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+  const barcode = product.barcode;
+
+  return `
+    <tr data-barcode="${escapeAttribute(barcode)}">
+      <td>${renderProductInfo(product)}</td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatDate(product.createdTime)}</div>
+        </div>
+      </td>
+      <td>
+        <div class="time-info">
+          <div class="duration">${getStatusText(product)}</div>
+        </div>
+      </td>
+      <td>
+        ${renderStoreStock(stocksByBarcode?.get(barcode))}
+      </td>
+    </tr>
+  `;
+}
+
 function renderListingRow(product: Product): string {
   const barcode = product.barcode;
   const duration = getDuration(product.createdTime, reminderSettings.listingReminderDays);
@@ -408,6 +482,7 @@ function renderProductRow(
   if (listType === "transfer") return renderTransferRow(product, stocksByBarcode);
   if (listType === "return") return renderReturnRow(product, stocksByBarcode);
   if (listType === "return-export") return renderReturnExportRow(product, stocksByBarcode);
+  if (listType === "inventory-query") return renderInventoryQueryRow(product, stocksByBarcode);
   return renderListingRow(product);
 }
 
@@ -415,6 +490,7 @@ async function renderProducts(): Promise<void> {
   const tbody = document.getElementById("product-list");
   if (!tbody) return;
 
+  updateInventoryQueryPanel();
   renderTableHead(activeListType);
 
   const now = getCurrentTimestamp();
@@ -424,6 +500,7 @@ async function renderProducts(): Promise<void> {
     ...candidateProductsByList.transfer,
     ...candidateProductsByList.return,
     ...candidateProductsByList["return-export"],
+    ...candidateProductsByList["inventory-query"],
   ];
   const stocksByBarcode = await getStocksByBarcodeForList(stockCandidates);
   const displayProductsByList = filterDisplayProductsByStock(
@@ -494,6 +571,78 @@ function getErrorMessage(error: unknown): string {
   if (error instanceof ProductActionError) return error.message;
   if (error instanceof Error) return error.message;
   return "操作失败";
+}
+
+function getInventoryDateInput(id: string): HTMLInputElement {
+  const input = document.getElementById(id) as HTMLInputElement | null;
+  if (!input) throw new Error("库存查询表单缺少日期输入项");
+  return input;
+}
+
+function getDateTimestamp(dateValue: string, endOfDay: boolean): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) throw new Error("日期格式无效");
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(
+    year,
+    month - 1,
+    day,
+    endOfDay ? 23 : 0,
+    endOfDay ? 59 : 0,
+    endOfDay ? 59 : 0,
+    0,
+  );
+
+  return Math.floor(date.getTime() / 1000);
+}
+
+function readInventoryQueryRange(): InventoryQueryRange {
+  const startDate = getInventoryDateInput("inventory-query-start-date").value;
+  const endDate = getInventoryDateInput("inventory-query-end-date").value;
+
+  if (!startDate || !endDate) {
+    throw new Error("请选择库存查询的开始日期和结束日期");
+  }
+
+  const startTime = getDateTimestamp(startDate, false);
+  const endTime = getDateTimestamp(endDate, true);
+  if (endTime < startTime) {
+    throw new Error("库存查询结束日期不能早于开始日期");
+  }
+
+  return {
+    startDate,
+    endDate,
+    startTime,
+    endTime,
+  };
+}
+
+function updateInventoryQueryPanel(): void {
+  const panel = document.getElementById("inventory-query-panel") as HTMLDivElement | null;
+  if (panel) {
+    panel.hidden = activeListType !== "inventory-query";
+  }
+}
+
+async function handleInventoryQuerySubmit(): Promise<void> {
+  try {
+    inventoryQueryRange = readInventoryQueryRange();
+    await renderProducts();
+  } catch (error) {
+    showToast(getErrorMessage(error), "error");
+  }
+}
+
+async function handleInventoryQueryClear(): Promise<void> {
+  inventoryQueryRange = null;
+  getInventoryDateInput("inventory-query-start-date").value = "";
+  getInventoryDateInput("inventory-query-end-date").value = "";
+  await renderProducts();
 }
 
 function isReminderTimeUnit(value: string): value is ReminderTimeUnit {
@@ -822,6 +971,24 @@ function initEventListeners(): void {
   const settingsEntryBtn = document.getElementById("settings-entry-btn");
   if (settingsEntryBtn) {
     settingsEntryBtn.addEventListener("click", openSettingsModal);
+  }
+
+  const inventoryQuerySubmitBtn = document.getElementById("inventory-query-submit-btn");
+  if (inventoryQuerySubmitBtn) {
+    inventoryQuerySubmitBtn.addEventListener("click", () => {
+      handleInventoryQuerySubmit().catch((error) => {
+        showToast(getErrorMessage(error), "error");
+      });
+    });
+  }
+
+  const inventoryQueryClearBtn = document.getElementById("inventory-query-clear-btn");
+  if (inventoryQueryClearBtn) {
+    inventoryQueryClearBtn.addEventListener("click", () => {
+      handleInventoryQueryClear().catch((error) => {
+        showToast(getErrorMessage(error), "error");
+      });
+    });
   }
 
   const settingsModal = document.getElementById("settings-modal");

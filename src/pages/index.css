@@ -97,6 +97,59 @@ body {
     color: white;
 }
 
+.inventory-query-panel {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 16px;
+    background: white;
+    border: 1px solid #eef1f5;
+    border-radius: 8px;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.inventory-query-panel[hidden] {
+    display: none;
+}
+
+.inventory-query-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.inventory-query-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #444;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.inventory-query-input {
+    width: 180px;
+    height: 36px;
+    padding: 0 10px;
+    border: 1px solid #d6dbe5;
+    border-radius: 6px;
+    color: #333;
+    font-size: 14px;
+}
+
+.inventory-query-input:focus {
+    border-color: #2f6fed;
+    box-shadow: 0 0 0 3px rgba(47, 111, 237, 0.14);
+    outline: none;
+}
+
+.inventory-query-actions {
+    display: flex;
+    gap: 8px;
+}
+
 .table-container {
     background: white;
     border-radius: 12px;
@@ -474,6 +527,29 @@ tr:last-child td {
 
     .settings-entry-btn {
         align-self: flex-end;
+    }
+
+    .inventory-query-panel {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .inventory-query-fields,
+    .inventory-query-actions {
+        width: 100%;
+    }
+
+    .inventory-query-field {
+        flex: 1 1 160px;
+    }
+
+    .inventory-query-input {
+        width: 100%;
+    }
+
+    .inventory-query-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
     }
 
     .modal {
