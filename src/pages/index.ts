@@ -39,7 +39,7 @@ declare global {
 const agent = new Agent(window.agentOptions || {});
 const db = initDB(agent);
 
-type ProductListType = "listing" | "transfer" | "return";
+type ProductListType = "listing" | "transfer" | "return" | "return-export";
 type ProductAction =
   | "mark-listed"
   | "postpone-listing"
@@ -54,7 +54,7 @@ interface TableColumn {
   width: number;
 }
 
-const LIST_TYPES: ProductListType[] = ["listing", "transfer", "return"];
+const LIST_TYPES: ProductListType[] = ["listing", "transfer", "return", "return-export"];
 const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
   listing: [
     { title: "商品信息", width: 240 },
@@ -75,13 +75,19 @@ const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
     { title: "门店库存", width: 180 },
     { title: "操作", width: 220 },
   ],
+  "return-export": [
+    { title: "商品信息", width: 240 },
+    { title: "上新时间", width: 180 },
+    { title: "回库时间", width: 180 },
+    { title: "门店库存", width: 180 },
+  ],
 };
 
 let activeListType: ProductListType = "listing";
 let reminderSettings: ReminderSettings = DEFAULT_REMINDER_SETTINGS;
 
 function isProductListType(value: string | undefined): value is ProductListType {
-  return value === "listing" || value === "transfer" || value === "return";
+  return value === "listing" || value === "transfer" || value === "return" || value === "return-export";
 }
 
 /**
@@ -128,6 +134,9 @@ function getSortTime(product: Product, listType: ProductListType): number {
   if (listType === "listing") {
     return product.createdTime;
   }
+  if (listType === "return-export") {
+    return product.returnedTime ?? product.listedTime ?? product.createdTime;
+  }
   return product.listedTime ?? 0;
 }
 
@@ -136,6 +145,12 @@ function getDisplayProducts(
   listType: ProductListType,
   now: number,
 ): Product[] {
+  if (listType === "return-export") {
+    return allProducts
+      .filter((product) => product.status === "returned")
+      .sort((a, b) => getSortTime(a, listType) - getSortTime(b, listType));
+  }
+
   const predicate = {
     listing: isInListingReminder,
     transfer: isInTransferReminder,
@@ -152,6 +167,7 @@ function getDisplayProductsByList(allProducts: Product[], now: number): DisplayP
     listing: getDisplayProducts(allProducts, "listing", now),
     transfer: getDisplayProducts(allProducts, "transfer", now),
     return: getDisplayProducts(allProducts, "return", now),
+    "return-export": getDisplayProducts(allProducts, "return-export", now),
   };
 }
 
@@ -174,12 +190,17 @@ function filterDisplayProductsByStock(
     listing: displayProductsByList.listing,
     transfer: filterProductsWithPositiveStock(displayProductsByList.transfer, stocksByBarcode),
     return: filterProductsWithPositiveStock(displayProductsByList.return, stocksByBarcode),
+    "return-export": filterProductsWithPositiveStock(
+      displayProductsByList["return-export"],
+      stocksByBarcode,
+    ),
   };
 }
 
 function getEmptyText(listType: ProductListType): string {
   if (listType === "transfer") return "暂无待调货商品";
   if (listType === "return") return "暂无待回库商品";
+  if (listType === "return-export") return "暂无可导出的回库商品";
   return "暂无待上新商品";
 }
 
@@ -188,7 +209,7 @@ function getTableColumnCount(listType: ProductListType): number {
 }
 
 function shouldLoadStocks(listType: ProductListType): boolean {
-  return listType === "transfer" || listType === "return";
+  return listType === "transfer" || listType === "return" || listType === "return-export";
 }
 
 function renderTableHead(listType: ProductListType): void {
@@ -329,6 +350,29 @@ function renderReturnRow(product: Product, stocksByBarcode?: Map<string, Stock[]
   `;
 }
 
+function renderReturnExportRow(product: Product, stocksByBarcode?: Map<string, Stock[]>): string {
+  const barcode = product.barcode;
+
+  return `
+    <tr data-barcode="${escapeAttribute(barcode)}">
+      <td>${renderProductInfo(product)}</td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatOptionalDate(product.listedTime)}</div>
+        </div>
+      </td>
+      <td>
+        <div class="time-info">
+          <div class="create-time">${formatOptionalDate(product.returnedTime)}</div>
+        </div>
+      </td>
+      <td>
+        ${renderStoreStock(stocksByBarcode?.get(barcode))}
+      </td>
+    </tr>
+  `;
+}
+
 function renderListingRow(product: Product): string {
   const barcode = product.barcode;
   const duration = getDuration(product.createdTime, reminderSettings.listingReminderDays);
@@ -363,6 +407,7 @@ function renderProductRow(
 ): string {
   if (listType === "transfer") return renderTransferRow(product, stocksByBarcode);
   if (listType === "return") return renderReturnRow(product, stocksByBarcode);
+  if (listType === "return-export") return renderReturnExportRow(product, stocksByBarcode);
   return renderListingRow(product);
 }
 
@@ -378,6 +423,7 @@ async function renderProducts(): Promise<void> {
   const stockCandidates = [
     ...candidateProductsByList.transfer,
     ...candidateProductsByList.return,
+    ...candidateProductsByList["return-export"],
   ];
   const stocksByBarcode = await getStocksByBarcodeForList(stockCandidates);
   const displayProductsByList = filterDisplayProductsByStock(
