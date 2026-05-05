@@ -31,9 +31,9 @@
                     <span>回库导出</span>
                     <span class="tab-count" data-count-type="return-export">0</span>
                 </button>
-                <button class="tab-btn" type="button" data-list-type="inventory-query" role="tab" aria-selected="false">
+                <button class="tab-btn" type="button" data-list-type="stock-query" role="tab" aria-selected="false">
                     <span>库存查询</span>
-                    <span class="tab-count" data-count-type="inventory-query">0</span>
+                    <span class="tab-count" data-count-type="stock-query">0</span>
                 </button>
             </div>
             <button class="btn btn-secondary settings-entry-btn" id="settings-entry-btn" type="button">
@@ -41,20 +41,20 @@
             </button>
         </div>
 
-        <div class="inventory-query-panel" id="inventory-query-panel" hidden>
-            <div class="inventory-query-fields">
-                <label class="inventory-query-field" for="inventory-query-start-date">
+        <div class="stock-query-panel" id="stock-query-panel" hidden>
+            <div class="stock-query-fields">
+                <label class="stock-query-field" for="stock-query-start-date">
                     <span>开始日期</span>
-                    <input class="inventory-query-input" id="inventory-query-start-date" type="date">
+                    <input class="stock-query-input" id="stock-query-start-date" type="date">
                 </label>
-                <label class="inventory-query-field" for="inventory-query-end-date">
+                <label class="stock-query-field" for="stock-query-end-date">
                     <span>结束日期</span>
-                    <input class="inventory-query-input" id="inventory-query-end-date" type="date">
+                    <input class="stock-query-input" id="stock-query-end-date" type="date">
                 </label>
             </div>
-            <div class="inventory-query-actions">
-                <button class="btn btn-primary" id="inventory-query-submit-btn" type="button">查询</button>
-                <button class="btn btn-secondary" id="inventory-query-clear-btn" type="button">清空</button>
+            <div class="stock-query-actions">
+                <button class="btn btn-primary" id="stock-query-submit-btn" type="button">查询</button>
+                <button class="btn btn-secondary" id="stock-query-clear-btn" type="button">清空</button>
             </div>
         </div>
 
