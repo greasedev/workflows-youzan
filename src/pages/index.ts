@@ -118,6 +118,8 @@ const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
 let activeListType: ProductListType = "listing";
 let reminderSettings: ReminderSettings = DEFAULT_REMINDER_SETTINGS;
 let stockQueryRange: StockQueryRange | null = null;
+let isReturnExporting = false;
+let isReturnExportConfirmationPending = false;
 
 function isProductListType(value: string | undefined): value is ProductListType {
   return (
@@ -309,7 +311,8 @@ function updateReturnExportPanel(displayProducts: Product[]): void {
     panel.hidden = activeListType !== "return-export";
   }
   if (exportBtn) {
-    exportBtn.disabled = activeListType !== "return-export" || displayProducts.length === 0;
+    exportBtn.disabled =
+      isReturnExporting || activeListType !== "return-export" || displayProducts.length === 0;
   }
 }
 
@@ -761,49 +764,62 @@ function triggerWorkbookDownload(store: string, rows: ReturnExportRow[], operati
 }
 
 async function handleReturnExport(): Promise<void> {
-  const now = getCurrentTimestamp();
-  const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
-  const candidateProductsByList = getDisplayProductsByList(allProducts, now);
-  const returnExportCandidates = candidateProductsByList["return-export"];
-  const stocksByBarcode = await getStocksByBarcodeForList(returnExportCandidates);
-  const returnExportProducts = filterProductsWithPositiveStock(
-    returnExportCandidates,
-    stocksByBarcode,
-  );
-
-  if (returnExportProducts.length === 0) {
-    showToast("暂无可导出的回库商品", "error");
-    await renderProducts();
+  if (isReturnExporting) {
     return;
   }
+  isReturnExporting = true;
+  await renderProducts();
+  let confirmationShown = false;
 
-  const exportRows = getReturnExportRows(returnExportProducts, stocksByBarcode);
-  if (exportRows.length === 0) {
-    showToast("暂无可导出的门店库存", "error");
-    await renderProducts();
-    return;
-  }
+  try {
+    const now = getCurrentTimestamp();
+    const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
+    const candidateProductsByList = getDisplayProductsByList(allProducts, now);
+    const returnExportCandidates = candidateProductsByList["return-export"];
+    const stocksByBarcode = await getStocksByBarcodeForList(returnExportCandidates);
+    const returnExportProducts = filterProductsWithPositiveStock(
+      returnExportCandidates,
+      stocksByBarcode,
+    );
 
-  const rowsByStore = new Map<string, ReturnExportRow[]>();
-  exportRows.forEach((row) => {
-    rowsByStore.set(row.store, [...(rowsByStore.get(row.store) ?? []), row]);
-  });
+    if (returnExportProducts.length === 0) {
+      showToast("暂无可导出的回库商品", "error");
+      return;
+    }
 
-  const operationDate = getTodayDateText();
-  rowsByStore.forEach((rows, store) => {
-    triggerWorkbookDownload(store, rows, operationDate);
-  });
+    const exportRows = getReturnExportRows(returnExportProducts, stocksByBarcode);
+    if (exportRows.length === 0) {
+      showToast("暂无可导出的门店库存", "error");
+      return;
+    }
 
-  const exportedBarcodes = [...new Set(exportRows.map((row) => row.product.barcode))];
-  showModal(
-    "确认导出成功",
-    `已生成 ${rowsByStore.size} 个回库列表 Excel 文件。确认文件已成功保存后，将 ${exportedBarcodes.length} 个商品标记为已导出。`,
-    async () => {
-      const exportedCount = await markReturnedProductsExported(db, exportedBarcodes);
+    const rowsByStore = new Map<string, ReturnExportRow[]>();
+    exportRows.forEach((row) => {
+      rowsByStore.set(row.store, [...(rowsByStore.get(row.store) ?? []), row]);
+    });
+
+    const operationDate = getTodayDateText();
+    rowsByStore.forEach((rows, store) => {
+      triggerWorkbookDownload(store, rows, operationDate);
+    });
+
+    const exportedBarcodes = [...new Set(exportRows.map((row) => row.product.barcode))];
+    isReturnExportConfirmationPending = true;
+    confirmationShown = true;
+    showModal(
+      "确认导出成功",
+      `已生成 ${rowsByStore.size} 个回库列表 Excel 文件。确认文件已成功保存后，将 ${exportedBarcodes.length} 个商品标记为已导出。`,
+      async () => {
+        const exportedCount = await markReturnedProductsExported(db, exportedBarcodes);
+        showToast(`已标记 ${exportedCount} 个商品为已导出`, "success");
+      },
+    );
+  } finally {
+    if (!confirmationShown) {
+      isReturnExporting = false;
       await renderProducts();
-      showToast(`已标记 ${exportedCount} 个商品为已导出`, "success");
-    },
-  );
+    }
+  }
 }
 
 function isReminderTimeUnit(value: string): value is ReminderTimeUnit {
@@ -1084,6 +1100,13 @@ function closeModal(): void {
   const modal = document.getElementById("confirm-modal");
   if (modal) {
     modal.classList.remove("active");
+  }
+  if (isReturnExportConfirmationPending) {
+    isReturnExportConfirmationPending = false;
+    isReturnExporting = false;
+    renderProducts().catch((error) => {
+      showToast(getErrorMessage(error), "error");
+    });
   }
 }
 
