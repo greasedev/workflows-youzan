@@ -491,6 +491,25 @@ function convertDaysToDisplayValue(days: number, unit: ReminderTimeUnit): number
   return Number.isInteger(days / 7) ? days / 7 : Math.max(1, Math.round(days / 7));
 }
 
+function readReminderDuration(
+  valueInputId: string,
+  unitSelectId: string,
+  label: string,
+): { days: number; unit: ReminderTimeUnit } {
+  const unit = getUnitValue(unitSelectId);
+  const value = getIntegerInputValue(valueInputId, label, 1);
+  return {
+    days: convertValueToDays(value, unit),
+    unit,
+  };
+}
+
+function assertGreaterThan(value: number, minValue: number, message: string): void {
+  if (value <= minValue) {
+    throw new Error(message);
+  }
+}
+
 function fillSettingsForm(settings: ReminderSettings): void {
   getInputElement("listing-reminder-value").value = String(
     convertDaysToDisplayValue(settings.listingReminderDays, settings.listingReminderUnit),
@@ -521,52 +540,52 @@ function fillSettingsForm(settings: ReminderSettings): void {
 }
 
 function readSettingsForm(): ReminderSettings {
-  const listingReminderUnit = getUnitValue("listing-reminder-unit");
-  const transferReminderUnit = getUnitValue("transfer-reminder-unit");
-  const transferReminderDeadlineUnit = getUnitValue("transfer-reminder-deadline-unit");
-  const returnReminderUnit = getUnitValue("return-reminder-unit");
-  const forceReturnUnit = getUnitValue("force-return-unit");
-  const transferReminderDays = convertValueToDays(
-    getIntegerInputValue("transfer-reminder-value", "调货提醒时间", 1),
-    transferReminderUnit,
+  const listingReminder = readReminderDuration(
+    "listing-reminder-value",
+    "listing-reminder-unit",
+    "上新提醒时间",
   );
-  const transferReminderDeadlineDays = convertValueToDays(
-    getIntegerInputValue("transfer-reminder-deadline-value", "调货提醒截止时间", 1),
-    transferReminderDeadlineUnit,
+  const transferReminder = readReminderDuration(
+    "transfer-reminder-value",
+    "transfer-reminder-unit",
+    "调货提醒时间",
+  );
+  const transferReminderDeadline = readReminderDuration(
+    "transfer-reminder-deadline-value",
+    "transfer-reminder-deadline-unit",
+    "调货提醒截止时间",
+  );
+  const returnReminder = readReminderDuration(
+    "return-reminder-value",
+    "return-reminder-unit",
+    "回库提醒时间",
+  );
+  const forceReturn = readReminderDuration(
+    "force-return-value",
+    "force-return-unit",
+    "强制回库时间",
   );
 
-  if (transferReminderDeadlineDays <= transferReminderDays) {
-    throw new Error("调货提醒截止时间必须大于调货提醒时间");
-  }
-
-  const returnReminderDays = convertValueToDays(
-    getIntegerInputValue("return-reminder-value", "回库提醒时间", 1),
-    returnReminderUnit,
-  );
-  const forceReturnDays = convertValueToDays(
-    getIntegerInputValue("force-return-value", "强制回库时间", 1),
-    forceReturnUnit,
+  assertGreaterThan(
+    transferReminderDeadline.days,
+    transferReminder.days,
+    "调货提醒截止时间必须大于调货提醒时间",
   );
 
-  if (forceReturnDays <= returnReminderDays) {
-    throw new Error("强制回库时间必须大于回库提醒时间");
-  }
+  assertGreaterThan(forceReturn.days, returnReminder.days, "强制回库时间必须大于回库提醒时间");
 
   return {
     id: reminderSettings.id,
-    listingReminderDays: convertValueToDays(
-      getIntegerInputValue("listing-reminder-value", "上新提醒时间", 1),
-      listingReminderUnit,
-    ),
-    listingReminderUnit,
-    transferReminderDays,
-    transferReminderUnit,
-    transferReminderDeadlineDays,
-    transferReminderDeadlineUnit,
-    returnReminderDays,
-    returnReminderUnit,
-    forceReturnDays,
-    forceReturnUnit,
+    listingReminderDays: listingReminder.days,
+    listingReminderUnit: listingReminder.unit,
+    transferReminderDays: transferReminder.days,
+    transferReminderUnit: transferReminder.unit,
+    transferReminderDeadlineDays: transferReminderDeadline.days,
+    transferReminderDeadlineUnit: transferReminderDeadline.unit,
+    returnReminderDays: returnReminder.days,
+    returnReminderUnit: returnReminder.unit,
+    forceReturnDays: forceReturn.days,
+    forceReturnUnit: forceReturn.unit,
     maxTransferPostponeCount: getIntegerInputValue(
       "transfer-postpone-count",
       "调货提醒最大推后次数",
