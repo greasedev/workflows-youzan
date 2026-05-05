@@ -69,8 +69,9 @@
             <div class="modal-title">参数设置</div>
             <form class="settings-form" id="settings-form">
                 <div class="settings-row">
-                    <label class="settings-label" for="listing-reminder-value">上新提醒时间</label>
+                    <label class="settings-label" for="listing-reminder-value">上新提醒</label>
                     <div class="settings-control">
+                        <span class="settings-label">距建档</span>
                         <input class="settings-input" id="listing-reminder-value" name="listingReminderValue" type="number" min="1" step="1" required>
                         <select class="settings-select" id="listing-reminder-unit" name="listingReminderUnit">
                             <option value="day">天</option>
@@ -79,8 +80,9 @@
                     </div>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label" for="transfer-reminder-value">调货提醒时间</label>
+                    <label class="settings-label" for="transfer-reminder-value">调货提醒</label>
                     <div class="settings-control">
+                        <span class="settings-label">距上新</span>
                         <input class="settings-input" id="transfer-reminder-value" name="transferReminderValue" type="number" min="1" step="1" required>
                         <select class="settings-select" id="transfer-reminder-unit" name="transferReminderUnit">
                             <option value="day">天</option>
@@ -89,8 +91,9 @@
                     </div>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label" for="transfer-reminder-deadline-value">调货提醒截止时间</label>
+                    <label class="settings-label" for="transfer-reminder-deadline-value">调货提醒截止</label>
                     <div class="settings-control">
+                        <span class="settings-label">距上新</span>
                         <input class="settings-input" id="transfer-reminder-deadline-value" name="transferReminderDeadlineValue" type="number" min="1" step="1" required>
                         <select class="settings-select" id="transfer-reminder-deadline-unit" name="transferReminderDeadlineUnit">
                             <option value="day">天</option>
@@ -99,8 +102,9 @@
                     </div>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label" for="return-reminder-value">回库提醒时间</label>
+                    <label class="settings-label" for="return-reminder-value">回库提醒</label>
                     <div class="settings-control">
+                        <span class="settings-label">距上新</span>
                         <input class="settings-input" id="return-reminder-value" name="returnReminderValue" type="number" min="1" step="1" required>
                         <select class="settings-select" id="return-reminder-unit" name="returnReminderUnit">
                             <option value="day">天</option>
@@ -109,8 +113,9 @@
                     </div>
                 </div>
                 <div class="settings-row">
-                    <label class="settings-label" for="force-return-value">强制回库时间</label>
+                    <label class="settings-label" for="force-return-value">强制回库</label>
                     <div class="settings-control">
+                        <span class="settings-label">距上新</span>
                         <input class="settings-input" id="force-return-value" name="forceReturnValue" type="number" min="1" step="1" required>
                         <select class="settings-select" id="force-return-unit" name="forceReturnUnit">
                             <option value="day">天</option>

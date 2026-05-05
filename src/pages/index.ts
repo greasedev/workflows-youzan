@@ -543,27 +543,27 @@ function readSettingsForm(): ReminderSettings {
   const listingReminder = readReminderDuration(
     "listing-reminder-value",
     "listing-reminder-unit",
-    "上新提醒时间",
+    "上新提醒",
   );
   const transferReminder = readReminderDuration(
     "transfer-reminder-value",
     "transfer-reminder-unit",
-    "调货提醒时间",
+    "调货提醒",
   );
   const transferReminderDeadline = readReminderDuration(
     "transfer-reminder-deadline-value",
     "transfer-reminder-deadline-unit",
-    "调货提醒截止时间",
+    "调货提醒截止",
   );
   const returnReminder = readReminderDuration(
     "return-reminder-value",
     "return-reminder-unit",
-    "回库提醒时间",
+    "回库提醒",
   );
   const forceReturn = readReminderDuration(
     "force-return-value",
     "force-return-unit",
-    "强制回库时间",
+    "强制回库",
   );
 
   assertGreaterThan(
