@@ -1,48 +1,48 @@
-/**
- * ---
- * name: 商品提醒周统计
- * description: 每周统计上新、调货、回库提醒的新增、完成、推后和待处理数量。
- *
- * output:
- * - success: bool
- * - message: string
- * - data: any
- * ---
- */
+// /**
+//  * ---
+//  * name: 商品提醒周统计
+//  * description: 每周统计上新、调货、回库提醒的新增、完成、推后和待处理数量。
+//  *
+//  * output:
+//  * - success: bool
+//  * - message: string
+//  * - data: any
+//  * ---
+//  */
 
-import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
-import { DB_TABLES, initDB } from "../libs/db";
-import { loadReminderSettings } from "../libs/settings";
-import { calculateWeeklyStats, getPreviousWeekPeriod } from "../libs/weekly_stats";
-import type { Product } from "../models/types";
+// import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
+// import { DB_TABLES, initDB } from "../libs/db";
+// import { loadReminderSettings } from "../libs/settings";
+// import { calculateWeeklyStats, getPreviousWeekPeriod } from "../libs/weekly_stats";
+// import type { Product } from "../models/types";
 
-export async function execute(context: WorkflowContext) {
-  const agent = new Agent(context.agentOptions || {});
-  const db = initDB(agent);
+// export async function execute(context: WorkflowContext) {
+//   const agent = new Agent(context.agentOptions || {});
+//   const db = initDB(agent);
 
-  console.log("Task:", context.task);
-  console.log("Params:", context.params);
-  console.log("Executing weekly stats workflow...");
+//   console.log("Task:", context.task);
+//   console.log("Params:", context.params);
+//   console.log("Executing weekly stats workflow...");
 
-  try {
-    const products = (await db.table(DB_TABLES.product).toArray()) as Product[];
-    const settings = await loadReminderSettings(db);
-    const stats = calculateWeeklyStats(products, getPreviousWeekPeriod(), settings);
+//   try {
+//     const products = (await db.table(DB_TABLES.product).toArray()) as Product[];
+//     const settings = await loadReminderSettings(db);
+//     const stats = calculateWeeklyStats(products, getPreviousWeekPeriod(), settings);
 
-    return {
-      success: true,
-      message: "Weekly stats generated successfully",
-      data: stats,
-    };
-  } catch (error) {
-    console.error("Workflow error:", error);
-    return {
-      success: false,
-      message: "Workflow failed",
-      error,
-    };
-  }
-}
+//     return {
+//       success: true,
+//       message: "Weekly stats generated successfully",
+//       data: stats,
+//     };
+//   } catch (error) {
+//     console.error("Workflow error:", error);
+//     return {
+//       success: false,
+//       message: "Workflow failed",
+//       error,
+//     };
+//   }
+// }
 
-// @ts-ignore
-globalThis.execute = execute;
+// // @ts-ignore
+// globalThis.execute = execute;
