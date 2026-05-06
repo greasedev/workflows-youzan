@@ -31,6 +31,12 @@ import {
   loadReminderSettings,
   saveReminderSettings,
 } from "../libs/settings";
+import {
+  createStockQueryRange,
+  isProductInStockQueryRange,
+  type StockQueryRange,
+} from "../libs/stock_query";
+import { filterProductsWithPositiveStock } from "../libs/stocks";
 
 // 扩展 Window 类型以包含 agentOptions
 declare global {
@@ -55,13 +61,6 @@ type DisplayProductsByList = Record<ProductListType, Product[]>;
 interface TableColumn {
   title: string;
   width: number;
-}
-
-interface StockQueryRange {
-  startDate: string;
-  endDate: string;
-  startTime: number;
-  endTime: number;
 }
 
 interface ReturnExportRow {
@@ -216,11 +215,7 @@ function getDisplayProducts(
     const queryRange = stockQueryRange;
     if (!queryRange) return [];
     return allProducts
-      .filter(
-        (product) =>
-          product.createdTime >= queryRange.startTime &&
-          product.createdTime <= queryRange.endTime,
-      )
+      .filter((product) => isProductInStockQueryRange(product, queryRange))
       .sort((a, b) => getSortTime(a, listType) - getSortTime(b, listType));
   }
 
@@ -243,17 +238,6 @@ function getDisplayProductsByList(allProducts: Product[], now: number): DisplayP
     "return-export": getDisplayProducts(allProducts, "return-export", now),
     "stock-query": getDisplayProducts(allProducts, "stock-query", now),
   };
-}
-
-function hasPositiveStock(stocksByBarcode: Map<string, Stock[]>, barcode: string): boolean {
-  return (stocksByBarcode.get(barcode) ?? []).some((stock) => stock.stock > 0);
-}
-
-function filterProductsWithPositiveStock(
-  products: Product[],
-  stocksByBarcode: Map<string, Stock[]>,
-): Product[] {
-  return products.filter((product) => hasPositiveStock(stocksByBarcode, product.barcode));
 }
 
 function filterDisplayProductsByStock(
@@ -653,47 +637,11 @@ function getStockDateInput(id: string): HTMLInputElement {
   return input;
 }
 
-function getDateTimestamp(dateValue: string, endOfDay: boolean): number {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
-  if (!match) throw new Error("日期格式无效");
-
-  const [, yearText, monthText, dayText] = match;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const date = new Date(
-    year,
-    month - 1,
-    day,
-    endOfDay ? 23 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 59 : 0,
-    0,
-  );
-
-  return Math.floor(date.getTime() / 1000);
-}
-
 function readStockQueryRange(): StockQueryRange {
   const startDate = getStockDateInput("stock-query-start-date").value;
   const endDate = getStockDateInput("stock-query-end-date").value;
 
-  if (!startDate || !endDate) {
-    throw new Error("请选择库存查询的开始日期和结束日期");
-  }
-
-  const startTime = getDateTimestamp(startDate, false);
-  const endTime = getDateTimestamp(endDate, true);
-  if (endTime < startTime) {
-    throw new Error("库存查询结束日期不能早于开始日期");
-  }
-
-  return {
-    startDate,
-    endDate,
-    startTime,
-    endTime,
-  };
+  return createStockQueryRange(startDate, endDate);
 }
 
 function updateStockQueryPanel(): void {

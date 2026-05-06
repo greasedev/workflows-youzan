@@ -55,7 +55,7 @@ function createImportStats(reportType: ReportType): ImportStats {
   };
 }
 
-function parseReportUrls(result: ExecutionResult): string[] {
+export function parseReportUrls(result: ExecutionResult): string[] {
   if (!result.success || !result.task) return [];
 
   const rawReportList = JSON.parse(result.task.extract_data || "[]") as unknown[];
@@ -65,7 +65,7 @@ function parseReportUrls(result: ExecutionResult): string[] {
   return [...new Set(urls)];
 }
 
-async function scanNewReportUrls(
+export async function scanNewReportUrls(
   db: any,
   reportType: ReportType,
   result: ExecutionResult,
@@ -92,7 +92,7 @@ async function scanNewReportUrls(
   return { newUrls, skippedReports };
 }
 
-async function markReportImported(
+export async function markReportImported(
   db: any,
   reportType: ReportType,
   url: string,
@@ -104,7 +104,7 @@ async function markReportImported(
   });
 }
 
-async function upsertImportedProduct(db: any, product: Product): Promise<void> {
+export async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   const existingProduct = await db
     .table(DB_TABLES.product)
     .where("barcode")
@@ -145,7 +145,7 @@ async function upsertImportedProduct(db: any, product: Product): Promise<void> {
   }
 }
 
-async function importProductReports(
+export async function importProductReports(
   db: any,
   result: ExecutionResult,
 ): Promise<ImportStats> {
@@ -167,7 +167,7 @@ async function importProductReports(
   return stats;
 }
 
-async function forceReturnOverdueProducts(
+export async function forceReturnOverdueProducts(
   db: any,
   settings: ReminderSettings,
   now = getCurrentTimestamp(),
@@ -197,7 +197,7 @@ async function forceReturnOverdueProducts(
   return forceReturnCount;
 }
 
-function mergeStockRows(stocks: Stock[]): Stock[] {
+export function mergeStockRows(stocks: Stock[]): Stock[] {
   const stocksByStore = new Map<string, Stock>();
   const lastUpdatedTime = getCurrentTimestamp();
 
@@ -218,7 +218,7 @@ function mergeStockRows(stocks: Stock[]): Stock[] {
   return [...stocksByStore.values()];
 }
 
-async function importStockReports(
+export async function importStockReports(
   db: any,
   result: ExecutionResult,
 ): Promise<ImportStats> {
