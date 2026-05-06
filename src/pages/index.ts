@@ -837,13 +837,13 @@ function isReminderTimeUnit(value: string): value is ReminderTimeUnit {
 
 function getInputElement(id: string): HTMLInputElement {
   const input = document.getElementById(id) as HTMLInputElement | null;
-  if (!input) throw new Error("参数设置表单缺少输入项");
+  if (!input) throw new Error("设置表单缺少输入项");
   return input;
 }
 
 function getSelectElement(id: string): HTMLSelectElement {
   const select = document.getElementById(id) as HTMLSelectElement | null;
-  if (!select) throw new Error("参数设置表单缺少单位选择项");
+  if (!select) throw new Error("设置表单缺少单位选择项");
   return select;
 }
 
@@ -1008,7 +1008,7 @@ async function handleSettingsSubmit(event: SubmitEvent): Promise<void> {
     reminderSettings = await saveReminderSettings(db, nextSettings);
     closeSettingsModal();
     await renderProducts();
-    showToast("参数设置已保存", "success");
+    showToast("设置已保存", "success");
   } catch (error) {
     showToast(getErrorMessage(error), "error");
   } finally {
@@ -1164,6 +1164,21 @@ function initEventListeners(): void {
   const settingsEntryBtn = document.getElementById("settings-entry-btn");
   if (settingsEntryBtn) {
     settingsEntryBtn.addEventListener("click", openSettingsModal);
+  }
+
+  const refreshListBtn = document.getElementById("refresh-list-btn") as HTMLButtonElement | null;
+  if (refreshListBtn) {
+    refreshListBtn.addEventListener("click", async () => {
+      refreshListBtn.disabled = true;
+      try {
+        await renderProducts();
+        showToast("列表已刷新", "success");
+      } catch (error) {
+        showToast(getErrorMessage(error), "error");
+      } finally {
+        refreshListBtn.disabled = false;
+      }
+    });
   }
 
   const stockQuerySubmitBtn = document.getElementById("stock-query-submit-btn");

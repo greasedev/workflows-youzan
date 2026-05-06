@@ -68,6 +68,11 @@ body {
     border-radius: var(--radius-md);
     background: var(--bg-muted);
 }
+.toolbar-actions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 8px;
+}
 .tab-btn {
     display: inline-flex;
     align-items: center;
@@ -487,7 +492,7 @@ tr:last-child td {
         padding: 8px 10px;
         font-size: 13px;
     }
-    .settings-entry-btn {
+    .toolbar-actions {
         align-self: flex-end;
     }
     .stock-query-fields,

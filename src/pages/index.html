@@ -36,9 +36,12 @@
                     <span class="tab-count" data-count-type="stock-query">0</span>
                 </button>
             </div>
-            <button class="btn btn-secondary settings-entry-btn" id="settings-entry-btn" type="button">
-                参数设置
-            </button>
+            <div class="toolbar-actions">
+                <button class="btn btn-secondary" id="refresh-list-btn" type="button">刷新</button>
+                <button class="btn btn-secondary settings-entry-btn" id="settings-entry-btn" type="button">
+                    设置
+                </button>
+            </div>
         </div>
 
         <div class="stock-query-panel" id="stock-query-panel" hidden>
@@ -91,12 +94,12 @@
         </div>
     </div>
 
-    <!-- 参数设置弹窗 -->
+    <!-- 设置弹窗 -->
     <div class="modal" id="settings-modal">
         <div class="modal-content settings-modal-content">
             <div class="settings-modal-header">
                 <div>
-                    <div class="modal-title">参数设置</div>
+                    <div class="modal-title">设置</div>
                     <div class="settings-modal-subtitle">配置提醒进入时间、截止时间和最大推后次数</div>
                 </div>
             </div>
