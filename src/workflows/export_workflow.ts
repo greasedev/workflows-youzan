@@ -29,6 +29,7 @@ export async function execute(context: WorkflowContext) {
   try {
     const { startTime, endTime } = getYesterdayRange();
     await apis.export_goods(startTime, endTime);
+    await apis.export_stock();
   } catch (error) {
     console.error("Workflow error:", error);
     return {
