@@ -3,6 +3,9 @@
  * name: 有赞商品数据导出至Excel
  * description: 将目标时间范围内建档的商品数据导出至Excel文件。
  * 
+ * cron:
+ * - 0 11 * * *
+ * 
  * output:
  * - success: bool
  * - message: string

@@ -2,6 +2,9 @@
  * ---
  * name: 有赞商品数据导入至Agent
  * description: 从有赞系统中导出的xlsx文件中导入商品和库存数据到数据库中。
+ * 
+ * cron:
+ * - 0 12 * * *
  *
  * output:
  * - success: bool
@@ -268,12 +271,18 @@ export async function execute(context: WorkflowContext) {
   console.log("Executing workflow...");
 
   try {
+    // 导入商品数据
+    console.log("Importing product data...");
     const goodsReportResult = await apis.get_goods_report();
     const productStats = await importProductReports(db, goodsReportResult);
 
+    // 导入库存数据
+    console.log("Importing stock data...");
     const stockReportResult = await apis.get_stock_report();
     const stockStats = await importStockReports(db, stockReportResult);
 
+    // 强制回库流程
+    console.log("Forcing return of overdue products...");
     const settings = await loadReminderSettings(db);
     const forceReturnCount = await forceReturnOverdueProducts(
       db,
