@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mock } from "node:test";
 import * as XLSX from "xlsx";
 import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../src/libs/xlsx";
+import { getYesterdayEndTimestamp } from "../src/libs/date";
 import { NOW } from "./helpers/fixtures";
 
 function createWorkbookBuffer(rows: Record<string, unknown>[]): ArrayBuffer {
@@ -63,7 +64,7 @@ test("商品 Excel 解析映射字段并过滤空条码", async (t) => {
   assert.ok(products[0].createdTime > 0);
 });
 
-test("商品 Excel 创建时间缺失或无效时使用当前时间", async (t) => {
+test("商品 Excel 创建时间缺失或无效时使用昨天结束时间", async (t) => {
   mockFetchWithWorkbooks(
     t,
     new Map([
@@ -93,12 +94,13 @@ test("商品 Excel 创建时间缺失或无效时使用当前时间", async (t) 
   const products = await fetchAndParseProductXlsx(
     "https://example.test/products-with-bad-time.xlsx",
   );
+  const fallbackCreatedTime = getYesterdayEndTimestamp(new Date(NOW * 1000));
 
   assert.deepEqual(
     products.map((product) => [product.barcode, product.createdTime]),
     [
-      ["SKU-MISSING-TIME", NOW],
-      ["SKU-BAD-TIME", NOW],
+      ["SKU-MISSING-TIME", fallbackCreatedTime],
+      ["SKU-BAD-TIME", fallbackCreatedTime],
     ],
   );
 });

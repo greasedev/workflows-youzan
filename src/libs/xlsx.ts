@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { Product, Stock } from "../models/types";
 import { getCurrentTimestamp } from "../libs/reminders";
+import { getYesterdayEndTimestamp } from "./date";
 
 type XlsxRowMapper<T extends Product | Stock> = (
   row: Record<string, unknown>,
@@ -64,7 +65,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
         product[productField] = Number(value) || 0;
         break;
       case "createdTime":
-        product.createdTime = parseCreatedTime(value) ?? getCurrentTimestamp();
+        product.createdTime = parseCreatedTime(value) ?? getYesterdayEndTimestamp();
         break;
       case "name":
       case "barcode":
@@ -74,7 +75,7 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
   }
 
   if (!product.createdTime) {
-    product.createdTime = getCurrentTimestamp();
+    product.createdTime = getYesterdayEndTimestamp();
   }
 
   return product;
