@@ -4,7 +4,7 @@
  * description: 从有赞系统中导出的xlsx文件中导入商品和库存数据到数据库中。
  * 
  * cron:
- * - 0 12 * * *
+ * - 30 17 * * *
  *
  * output:
  * - success: bool
