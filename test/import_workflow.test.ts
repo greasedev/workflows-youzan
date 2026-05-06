@@ -30,6 +30,19 @@ function resultWithUrls(urls: string[]): ExecutionResult {
   };
 }
 
+function resultWithExtractData(extractData?: string): ExecutionResult {
+  return {
+    success: true,
+    task: {
+      id: "task-1",
+      status: "succeeded",
+      extract_data: extractData,
+      metrics_tokens: 0,
+      metrics_time: 0,
+    },
+  };
+}
+
 function createWorkbookBuffer(rows: Record<string, unknown>[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -65,6 +78,16 @@ test("报表 URL 解析会去空、去重，并按 type + url 区分已导入报
     "b.xlsx",
   ]);
   assert.deepEqual(parseReportUrls({ success: false }), []);
+  assert.deepEqual(parseReportUrls(resultWithExtractData("")), []);
+  assert.deepEqual(parseReportUrls(resultWithExtractData(undefined)), []);
+  assert.throws(
+    () => parseReportUrls(resultWithExtractData("{bad-json")),
+    /报表 URL 列表不是合法 JSON/,
+  );
+  assert.throws(
+    () => parseReportUrls(resultWithExtractData('{"url":"a.xlsx"}')),
+    /报表 URL 列表必须是数组/,
+  );
 
   await db.table(DB_TABLES.report).add({ type: "product", url: "same.xlsx", timestamp: NOW });
 

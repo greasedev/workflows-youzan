@@ -24,6 +24,13 @@ export function getDateTimestamp(dateValue: string, endOfDay: boolean): number {
     endOfDay ? 59 : 0,
     0,
   );
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    throw new Error("日期格式无效");
+  }
 
   return Math.floor(date.getTime() / 1000);
 }
@@ -50,4 +57,3 @@ export function createStockQueryRange(startDate: string, endDate: string): Stock
 export function isProductInStockQueryRange(product: Product, range: StockQueryRange): boolean {
   return product.createdTime >= range.startTime && product.createdTime <= range.endTime;
 }
-

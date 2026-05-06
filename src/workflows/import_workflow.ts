@@ -58,7 +58,20 @@ function createImportStats(reportType: ReportType): ImportStats {
 export function parseReportUrls(result: ExecutionResult): string[] {
   if (!result.success || !result.task) return [];
 
-  const rawReportList = JSON.parse(result.task.extract_data || "[]") as unknown[];
+  const rawExtractData = result.task.extract_data?.trim();
+  if (!rawExtractData) return [];
+
+  let rawReportList: unknown;
+  try {
+    rawReportList = JSON.parse(rawExtractData);
+  } catch {
+    throw new Error("报表 URL 列表不是合法 JSON");
+  }
+
+  if (!Array.isArray(rawReportList)) {
+    throw new Error("报表 URL 列表必须是数组");
+  }
+
   const urls = rawReportList
     .map((item) => String(item).trim())
     .filter((url) => url.length > 0);

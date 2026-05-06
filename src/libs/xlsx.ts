@@ -25,7 +25,7 @@ const STOCK_COLUMN_MAPPING: Record<string, keyof Stock> = {
 const EXCEL_EPOCH_OFFSET_DAYS = 25569;
 const SECONDS_PER_DAY = 86400;
 
-function parseCreatedTime(value: unknown): number {
+function parseCreatedTime(value: unknown): number | undefined {
   if (typeof value === "number") {
     if (value > 1000000000) return Math.floor(value);
     return Math.floor((value - EXCEL_EPOCH_OFFSET_DAYS) * SECONDS_PER_DAY);
@@ -34,7 +34,7 @@ function parseCreatedTime(value: unknown): number {
   const dateStr = String(value).trim();
   const normalizedDateStr = dateStr.replace(/-/g, "/");
   const date = new Date(normalizedDateStr);
-  if (Number.isNaN(date.getTime())) return 0;
+  if (Number.isNaN(date.getTime())) return undefined;
   return Math.floor(date.getTime() / 1000);
 }
 
@@ -64,13 +64,17 @@ function mapRowToProduct(row: Record<string, unknown>): Product {
         product[productField] = Number(value) || 0;
         break;
       case "createdTime":
-        product.createdTime = parseCreatedTime(value);
+        product.createdTime = parseCreatedTime(value) ?? getCurrentTimestamp();
         break;
       case "name":
       case "barcode":
         product[productField] = String(value).trim();
         break;
     }
+  }
+
+  if (!product.createdTime) {
+    product.createdTime = getCurrentTimestamp();
   }
 
   return product;
@@ -98,7 +102,7 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
         stock[stockField] = Number(value) || 0;
         break;
       case "lastUpdatedTime":
-        stock.lastUpdatedTime = parseCreatedTime(value);
+        stock.lastUpdatedTime = parseCreatedTime(value) ?? getCurrentTimestamp();
         break;
       case "barcode":
       case "store":

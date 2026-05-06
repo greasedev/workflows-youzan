@@ -1,7 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mock } from "node:test";
 import * as XLSX from "xlsx";
 import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../src/libs/xlsx";
+import { NOW } from "./helpers/fixtures";
 
 function createWorkbookBuffer(rows: Record<string, unknown>[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
@@ -59,6 +61,46 @@ test("商品 Excel 解析映射字段并过滤空条码", async (t) => {
   assert.equal(products[0].transferRemindCount, 0);
   assert.equal(products[0].returnRemindCount, 0);
   assert.ok(products[0].createdTime > 0);
+});
+
+test("商品 Excel 创建时间缺失或无效时使用当前时间", async (t) => {
+  mockFetchWithWorkbooks(
+    t,
+    new Map([
+      [
+        "https://example.test/products-with-bad-time.xlsx",
+        createWorkbookBuffer([
+          {
+            商品名称: "缺失时间商品",
+            商品条码: "SKU-MISSING-TIME",
+            零售价: 12,
+          },
+          {
+            商品名称: "无效时间商品",
+            商品条码: "SKU-BAD-TIME",
+            零售价: 13,
+            创建时间: "not-a-date",
+          },
+        ]),
+      ],
+    ]),
+  );
+  const dateNowMock = mock.method(Date, "now", () => NOW * 1000);
+  t.after(() => {
+    dateNowMock.mock.restore();
+  });
+
+  const products = await fetchAndParseProductXlsx(
+    "https://example.test/products-with-bad-time.xlsx",
+  );
+
+  assert.deepEqual(
+    products.map((product) => [product.barcode, product.createdTime]),
+    [
+      ["SKU-MISSING-TIME", NOW],
+      ["SKU-BAD-TIME", NOW],
+    ],
+  );
 });
 
 test("库存 Excel 解析商品条码(SPU)列并过滤非正库存", async (t) => {
