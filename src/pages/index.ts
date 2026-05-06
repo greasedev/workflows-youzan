@@ -4,6 +4,7 @@
  */
 
 import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
+import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { Product, DurationResult, Stock, ReminderSettings, ReminderTimeUnit } from "../models/types";
 import { formatDate, formatOptionalDate } from "../libs/date";
@@ -733,7 +734,7 @@ function getReturnExportRows(
   );
 }
 
-function triggerWorkbookDownload(store: string, rows: ReturnExportRow[], operationDate: string): void {
+function createReturnExportWorkbookData(rows: ReturnExportRow[], operationDate: string): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(
     rows.map((row) => ({
@@ -749,14 +750,24 @@ function triggerWorkbookDownload(store: string, rows: ReturnExportRow[], operati
   );
   XLSX.utils.book_append_sheet(workbook, worksheet, "回库列表");
 
-  const fileData = XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
-  const blob = new Blob([fileData], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  return XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+}
+
+async function triggerReturnExportZipDownload(
+  rowsByStore: Map<string, ReturnExportRow[]>,
+  operationDate: string,
+): Promise<void> {
+  const zip = new JSZip();
+  rowsByStore.forEach((rows, store) => {
+    const fileData = createReturnExportWorkbookData(rows, operationDate);
+    zip.file(`${sanitizeFilenamePart(store)}_回库列表_${getTodayFilenameDateText()}.xlsx`, fileData);
   });
+
+  const blob = await zip.generateAsync({ type: "blob" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${sanitizeFilenamePart(store)}_回库列表_${getTodayFilenameDateText()}.xlsx`;
+  link.download = `回库列表_${getTodayFilenameDateText()}.zip`;
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -799,9 +810,7 @@ async function handleReturnExport(): Promise<void> {
     });
 
     const operationDate = getTodayDateText();
-    rowsByStore.forEach((rows, store) => {
-      triggerWorkbookDownload(store, rows, operationDate);
-    });
+    await triggerReturnExportZipDownload(rowsByStore, operationDate);
 
     const exportedBarcodes = [...new Set(exportRows.map((row) => row.product.barcode))];
     isReturnExportConfirmationPending = true;

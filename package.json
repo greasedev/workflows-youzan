@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@greaseclaw/workflow-sdk": "github:greasedev/workflow-sdk#main",
+    "jszip": "^3.10.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
