@@ -2,7 +2,7 @@ function getLocalDateAtTime(date: Date, hours: number, minutes: number, seconds:
   return new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes, seconds, 0);
 }
 
-function toTimestamp(date: Date): number {
+export function toTimestamp(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 

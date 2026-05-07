@@ -53,13 +53,13 @@ function createApis(params: {
   };
 }
 
-test("商品导出范围在无商品时回退到昨天整天", () => {
+test("商品导出范围在无商品时从昨天开始到当前时间", () => {
   const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
 
   assert.deepEqual(getGoodsExportRange(undefined, referenceDate), {
     goodsExportSkipped: false,
     goodsExportStartTime: "2026-05-05 00:00:00",
-    goodsExportEndTime: "2026-05-05 23:59:59",
+    goodsExportEndTime: "2026-05-06 12:00:00",
     maxProductCreatedTime: undefined,
   });
 });
@@ -71,18 +71,18 @@ test("商品导出范围在有商品时从最大 createdTime 加 1 秒开始", (
   assert.deepEqual(getGoodsExportRange(maxCreatedTime, referenceDate), {
     goodsExportSkipped: false,
     goodsExportStartTime: "2026-05-03 08:30:01",
-    goodsExportEndTime: "2026-05-05 23:59:59",
+    goodsExportEndTime: "2026-05-06 12:00:00",
     maxProductCreatedTime: maxCreatedTime,
   });
 });
 
-test("商品水位超过昨天结束时跳过商品导出但仍导出库存", async (t) => {
+test("商品水位达到当前时间时跳过商品导出但仍导出库存", async (t) => {
   const db = await createTestDb();
   t.after(() => cleanupTestDb(db));
   const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
-  const yesterdayEnd = Math.floor(new Date(2026, 4, 5, 23, 59, 59).getTime() / 1000);
+  const currentTimestamp = Math.floor(referenceDate.getTime() / 1000);
   await db.table(DB_TABLES.product).add(
-    productFactory({ barcode: "SKU-WATERMARK", createdTime: yesterdayEnd }),
+    productFactory({ barcode: "SKU-WATERMARK", createdTime: currentTimestamp }),
   );
   const apiHarness = createApis({});
 
@@ -112,7 +112,7 @@ test("export_workflow 使用 product 表最大 createdTime 调用商品导出和
   const data = await executeExportWorkflow(db, apiHarness.apis, referenceDate);
 
   assert.equal(data.goodsExportSkipped, false);
-  assert.deepEqual(apiHarness.goodsCalls, [["2026-05-03 08:30:01", "2026-05-05 23:59:59"]]);
+  assert.deepEqual(apiHarness.goodsCalls, [["2026-05-03 08:30:01", "2026-05-06 12:00:00"]]);
   assert.equal(apiHarness.stockCalls, 1);
 });
 
@@ -141,4 +141,3 @@ test("export_stock 失败时 workflow 失败", async (t) => {
   );
   assert.equal(apiHarness.stockCalls, 1);
 });
-

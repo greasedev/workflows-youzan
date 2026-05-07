@@ -18,8 +18,8 @@ import { createWorkflowApis, type ExecutionResult, type WorkflowApis } from "../
 import { DB_TABLES, initDB } from "../libs/db";
 import {
   formatDateTime,
-  getYesterdayEndTimestamp,
   getYesterdayStartTimestamp,
+  toTimestamp,
 } from "../libs/date";
 import type { Product } from "../models/types";
 
@@ -52,7 +52,7 @@ export function getGoodsExportRange(
   maxProductCreatedTime: number | undefined,
   referenceDate = new Date(Date.now()),
 ): GoodsExportRange {
-  const endTimestamp = getYesterdayEndTimestamp(referenceDate);
+  const endTimestamp = toTimestamp(referenceDate);
   const startTimestamp =
     maxProductCreatedTime == null
       ? getYesterdayStartTimestamp(referenceDate)
