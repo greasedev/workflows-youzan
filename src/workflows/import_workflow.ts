@@ -97,6 +97,8 @@ export async function scanNewReportUrls(
       skippedReports += 1;
       console.log(`${reportType} report ${url} already exists`);
       continue;
+    } else {
+      console.log(`${reportType} report ${url} is new`);
     }
 
     newUrls.push(url);
