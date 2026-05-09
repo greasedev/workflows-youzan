@@ -322,7 +322,6 @@ function updateReturnExportPanel(displayProducts: Product[]): void {
 function updateBarcodeSearchPanel(): void {
   const panel = document.getElementById("barcode-search-panel") as HTMLDivElement | null;
   const input = document.getElementById("barcode-search-input") as HTMLInputElement | null;
-  const clearBtn = document.getElementById("barcode-search-clear-btn") as HTMLButtonElement | null;
   const isSearchable = isBarcodeSearchListType(activeListType);
 
   if (panel) {
@@ -333,9 +332,6 @@ function updateBarcodeSearchPanel(): void {
   const searchText = barcodeSearchByList[activeListType];
   if (input && input.value !== searchText) {
     input.value = searchText;
-  }
-  if (clearBtn) {
-    clearBtn.disabled = searchText.trim().length === 0;
   }
 }
 
@@ -703,13 +699,6 @@ async function handleStockQuerySubmit(): Promise<void> {
   } catch (error) {
     showToast(getErrorMessage(error), "error");
   }
-}
-
-async function handleStockQueryClear(): Promise<void> {
-  stockQueryRange = null;
-  getStockDateInput("stock-query-start-date").value = "";
-  getStockDateInput("stock-query-end-date").value = "";
-  await renderProducts();
 }
 
 function getReturnExportRows(
@@ -1183,31 +1172,11 @@ function initEventListeners(): void {
     });
   }
 
-  const stockQueryClearBtn = document.getElementById("stock-query-clear-btn");
-  if (stockQueryClearBtn) {
-    stockQueryClearBtn.addEventListener("click", () => {
-      handleStockQueryClear().catch((error) => {
-        showToast(getErrorMessage(error), "error");
-      });
-    });
-  }
-
   const barcodeSearchInput = document.getElementById("barcode-search-input") as HTMLInputElement | null;
   if (barcodeSearchInput) {
     barcodeSearchInput.addEventListener("input", () => {
       if (!isBarcodeSearchListType(activeListType)) return;
       barcodeSearchByList[activeListType] = barcodeSearchInput.value;
-      renderProducts().catch((error) => {
-        showToast(getErrorMessage(error), "error");
-      });
-    });
-  }
-
-  const barcodeSearchClearBtn = document.getElementById("barcode-search-clear-btn");
-  if (barcodeSearchClearBtn) {
-    barcodeSearchClearBtn.addEventListener("click", () => {
-      if (!isBarcodeSearchListType(activeListType)) return;
-      barcodeSearchByList[activeListType] = "";
       renderProducts().catch((error) => {
         showToast(getErrorMessage(error), "error");
       });

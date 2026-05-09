@@ -131,8 +131,14 @@ body {
 .stock-query-panel[hidden] {
     display: none;
 }
+.stock-query-panel {
+    justify-content: flex-end;
+}
 .barcode-search-panel[hidden] {
     display: none;
+}
+.barcode-search-panel {
+    justify-content: flex-end;
 }
 .return-export-panel {
     justify-content: flex-end;
@@ -178,19 +184,13 @@ body {
 }
 .barcode-search-field {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 1 360px;
     align-items: center;
-    gap: 10px;
+    justify-content: flex-end;
     min-width: 0;
 }
-.barcode-search-label {
-    flex: 0 0 auto;
-    color: var(--text-secondary);
-    font-size: 14px;
-    font-weight: 500;
-}
 .barcode-search-input {
-    width: min(100%, 360px);
+    width: 100%;
     height: 36px;
     padding: 0 12px;
 }
@@ -531,9 +531,7 @@ tr:last-child td {
         width: 100%;
     }
     .barcode-search-field {
-        align-items: stretch;
-        flex-direction: column;
-        gap: 6px;
+        flex: 1 1 auto;
     }
     .barcode-search-input {
         width: 100%;
