@@ -35,11 +35,6 @@ interface ReportUrlScan {
   skippedReports: number;
 }
 
-interface ParsedStockReport {
-  url: string;
-  stocks: Stock[];
-}
-
 interface ImportWorkflowData {
   product: ImportStats;
   stock: ImportStats;
@@ -238,20 +233,22 @@ export async function importStockReports(
   result: ExecutionResult,
 ): Promise<ImportStats> {
   const stats = createImportStats("stock");
-  const { newUrls, skippedReports } = await scanNewReportUrls(db, "stock", result);
-  stats.skippedReports = skippedReports;
+  const [latestUrl] = parseReportUrls(result);
+  if (!latestUrl) return stats;
 
-  if (newUrls.length === 0) return stats;
-
-  const parsedReports: ParsedStockReport[] = [];
-  for (const url of newUrls) {
-    parsedReports.push({
-      url,
-      stocks: await fetchAndParseStockXlsx(url),
-    });
+  const existingReport = await db
+    .table(DB_TABLES.report)
+    .where("[type+url]")
+    .equals(["stock", latestUrl])
+    .first();
+  if (existingReport !== undefined) {
+    console.log(`stock report ${latestUrl} already exists`);
+    stats.skippedReports = 1;
+    return stats;
   }
 
-  const mergedStocks = mergeStockRows(parsedReports.flatMap((report) => report.stocks));
+  console.log(`stock report ${latestUrl} is new`);
+  const mergedStocks = mergeStockRows(await fetchAndParseStockXlsx(latestUrl));
 
   await db.transaction(
     "rw",
@@ -263,13 +260,11 @@ export async function importStockReports(
         await db.table(DB_TABLES.stock).bulkAdd(mergedStocks);
       }
 
-      for (const report of parsedReports) {
-        await markReportImported(db, "stock", report.url);
-      }
+      await markReportImported(db, "stock", latestUrl);
     },
   );
 
-  stats.importedReports = parsedReports.length;
+  stats.importedReports = 1;
   stats.importedRows = mergedStocks.length;
 
   return stats;
