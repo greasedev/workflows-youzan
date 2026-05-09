@@ -7,6 +7,7 @@ import { Agent, AgentOptions } from "@greaseclaw/workflow-sdk";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { Product, DurationResult, Stock, ReminderSettings, ReminderTimeUnit } from "../models/types";
+import { filterProductsByBarcodeSearch } from "../libs/barcode_search";
 import { formatDate, formatOptionalDate } from "../libs/date";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
@@ -49,6 +50,7 @@ const agent = new Agent(window.agentOptions || {});
 const db = initDB(agent);
 
 type ProductListType = "listing" | "transfer" | "return" | "return-export" | "stock-query";
+type BarcodeSearchListType = Exclude<ProductListType, "stock-query">;
 type ProductAction =
   | "mark-listed"
   | "postpone-listing"
@@ -75,6 +77,12 @@ const LIST_TYPES: ProductListType[] = [
   "return",
   "return-export",
   "stock-query",
+];
+const BARCODE_SEARCH_LIST_TYPES: BarcodeSearchListType[] = [
+  "listing",
+  "transfer",
+  "return",
+  "return-export",
 ];
 const TABLE_COLUMNS: Record<ProductListType, TableColumn[]> = {
   listing: [
@@ -120,6 +128,12 @@ let reminderSettings: ReminderSettings = DEFAULT_REMINDER_SETTINGS;
 let stockQueryRange: StockQueryRange | null = null;
 let isReturnExporting = false;
 let isReturnExportConfirmationPending = false;
+let barcodeSearchByList: Record<BarcodeSearchListType, string> = {
+  listing: "",
+  transfer: "",
+  return: "",
+  "return-export": "",
+};
 
 function isProductListType(value: string | undefined): value is ProductListType {
   return (
@@ -129,6 +143,10 @@ function isProductListType(value: string | undefined): value is ProductListType 
     value === "return-export" ||
     value === "stock-query"
   );
+}
+
+function isBarcodeSearchListType(listType: ProductListType): listType is BarcodeSearchListType {
+  return BARCODE_SEARCH_LIST_TYPES.includes(listType as BarcodeSearchListType);
 }
 
 /**
@@ -298,6 +316,26 @@ function updateReturnExportPanel(displayProducts: Product[]): void {
   if (exportBtn) {
     exportBtn.disabled =
       isReturnExporting || activeListType !== "return-export" || displayProducts.length === 0;
+  }
+}
+
+function updateBarcodeSearchPanel(): void {
+  const panel = document.getElementById("barcode-search-panel") as HTMLDivElement | null;
+  const input = document.getElementById("barcode-search-input") as HTMLInputElement | null;
+  const clearBtn = document.getElementById("barcode-search-clear-btn") as HTMLButtonElement | null;
+  const isSearchable = isBarcodeSearchListType(activeListType);
+
+  if (panel) {
+    panel.hidden = !isSearchable;
+  }
+  if (!isSearchable) return;
+
+  const searchText = barcodeSearchByList[activeListType];
+  if (input && input.value !== searchText) {
+    input.value = searchText;
+  }
+  if (clearBtn) {
+    clearBtn.disabled = searchText.trim().length === 0;
   }
 }
 
@@ -546,6 +584,7 @@ async function renderProducts(): Promise<void> {
   if (!tbody) return;
 
   updateStockQueryPanel();
+  updateBarcodeSearchPanel();
   renderTableHead(activeListType);
 
   const now = getCurrentTimestamp();
@@ -563,9 +602,15 @@ async function renderProducts(): Promise<void> {
     stocksByBarcode,
   );
   updateTabCounts(displayProductsByList);
-  const displayProducts = displayProductsByList[activeListType];
+  const unsearchedDisplayProducts = displayProductsByList[activeListType];
+  const displayProducts = isBarcodeSearchListType(activeListType)
+    ? filterProductsByBarcodeSearch(
+        unsearchedDisplayProducts,
+        barcodeSearchByList[activeListType],
+      )
+    : unsearchedDisplayProducts;
   const rowStocksByBarcode = shouldLoadStocks(activeListType) ? stocksByBarcode : undefined;
-  updateReturnExportPanel(displayProducts);
+  updateReturnExportPanel(unsearchedDisplayProducts);
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
@@ -1142,6 +1187,28 @@ function initEventListeners(): void {
   if (stockQueryClearBtn) {
     stockQueryClearBtn.addEventListener("click", () => {
       handleStockQueryClear().catch((error) => {
+        showToast(getErrorMessage(error), "error");
+      });
+    });
+  }
+
+  const barcodeSearchInput = document.getElementById("barcode-search-input") as HTMLInputElement | null;
+  if (barcodeSearchInput) {
+    barcodeSearchInput.addEventListener("input", () => {
+      if (!isBarcodeSearchListType(activeListType)) return;
+      barcodeSearchByList[activeListType] = barcodeSearchInput.value;
+      renderProducts().catch((error) => {
+        showToast(getErrorMessage(error), "error");
+      });
+    });
+  }
+
+  const barcodeSearchClearBtn = document.getElementById("barcode-search-clear-btn");
+  if (barcodeSearchClearBtn) {
+    barcodeSearchClearBtn.addEventListener("click", () => {
+      if (!isBarcodeSearchListType(activeListType)) return;
+      barcodeSearchByList[activeListType] = "";
+      renderProducts().catch((error) => {
         showToast(getErrorMessage(error), "error");
       });
     });

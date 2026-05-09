@@ -115,6 +115,7 @@ body {
     color: white;
 }
 .stock-query-panel,
+.barcode-search-panel,
 .return-export-panel {
     display: flex;
     align-items: flex-end;
@@ -128,6 +129,9 @@ body {
     box-shadow: var(--shadow-sm);
 }
 .stock-query-panel[hidden] {
+    display: none;
+}
+.barcode-search-panel[hidden] {
     display: none;
 }
 .return-export-panel {
@@ -156,6 +160,7 @@ body {
     font-size: 14px;
 }
 .stock-query-input,
+.barcode-search-input,
 .settings-input,
 .settings-select {
     width: 100%;
@@ -171,6 +176,24 @@ body {
     height: 36px;
     padding: 0 10px;
 }
+.barcode-search-field {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+.barcode-search-label {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+}
+.barcode-search-input {
+    width: min(100%, 360px);
+    height: 36px;
+    padding: 0 12px;
+}
 .settings-input,
 .settings-select {
     height: 38px;
@@ -183,6 +206,7 @@ body {
     cursor: pointer;
 }
 .stock-query-input:focus,
+.barcode-search-input:focus,
 .settings-input:focus,
 .settings-select:focus {
     border-color: var(--accent);
@@ -477,6 +501,7 @@ tr:last-child td {
 @media (max-width: 768px) {
     .list-toolbar,
     .stock-query-panel,
+    .barcode-search-panel,
     .return-export-panel {
         align-items: stretch;
         flex-direction: column;
@@ -503,6 +528,14 @@ tr:last-child td {
         flex: 1 1 160px;
     }
     .stock-query-input {
+        width: 100%;
+    }
+    .barcode-search-field {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .barcode-search-input {
         width: 100%;
     }
     .stock-query-actions,
