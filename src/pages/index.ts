@@ -317,12 +317,9 @@ function renderTableHead(listType: ProductListType): void {
 }
 
 function updateReturnExportPanel(displayProducts: Product[]): void {
-  const panel = document.getElementById("return-export-panel") as HTMLDivElement | null;
   const exportBtn = document.getElementById("return-export-btn") as HTMLButtonElement | null;
-  if (panel) {
-    panel.hidden = activeListType !== "return-export";
-  }
   if (exportBtn) {
+    exportBtn.hidden = activeListType !== "return-export";
     exportBtn.disabled =
       isReturnExporting || activeListType !== "return-export" || displayProducts.length === 0;
   }

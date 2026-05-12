@@ -67,13 +67,12 @@
 
         <div class="barcode-search-panel" id="barcode-search-panel" hidden>
             <div class="stock-snapshot-time" id="barcode-stock-snapshot-time" hidden>库存更新时间：-</div>
-            <label class="barcode-search-field" for="barcode-search-input">
-                <input class="barcode-search-input" id="barcode-search-input" type="search" placeholder="输入商品条码搜索">
-            </label>
-        </div>
-
-        <div class="return-export-panel" id="return-export-panel" hidden>
-            <button class="btn btn-primary" id="return-export-btn" type="button" disabled>导出Excel</button>
+            <div class="barcode-search-actions">
+                <label class="barcode-search-field" for="barcode-search-input">
+                    <input class="barcode-search-input" id="barcode-search-input" type="search" placeholder="输入商品条码搜索">
+                </label>
+                <button class="btn btn-primary" id="return-export-btn" type="button" hidden disabled>导出Excel</button>
+            </div>
         </div>
 
         <div class="table-container">
