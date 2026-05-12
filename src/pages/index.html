@@ -45,21 +45,25 @@
         </div>
 
         <div class="stock-query-panel" id="stock-query-panel" hidden>
-            <div class="stock-query-fields">
-                <label class="stock-query-field" for="stock-query-start-date">
-                    <input class="stock-query-input" id="stock-query-start-date" type="date">
-                </label>
-                <span class="stock-query-separator">至</span>
-                <label class="stock-query-field" for="stock-query-end-date">
-                    <input class="stock-query-input" id="stock-query-end-date" type="date">
-                </label>
-            </div>
-            <div class="stock-query-actions">
-                <button class="btn btn-primary" id="stock-query-submit-btn" type="button">查询</button>
+            <div class="stock-snapshot-time" id="stock-query-snapshot-time">库存更新时间：-</div>
+            <div class="stock-query-controls">
+                <div class="stock-query-fields">
+                    <label class="stock-query-field" for="stock-query-start-date">
+                        <input class="stock-query-input" id="stock-query-start-date" type="date">
+                    </label>
+                    <span class="stock-query-separator">至</span>
+                    <label class="stock-query-field" for="stock-query-end-date">
+                        <input class="stock-query-input" id="stock-query-end-date" type="date">
+                    </label>
+                </div>
+                <div class="stock-query-actions">
+                    <button class="btn btn-primary" id="stock-query-submit-btn" type="button">查询</button>
+                </div>
             </div>
         </div>
 
         <div class="barcode-search-panel" id="barcode-search-panel" hidden>
+            <div class="stock-snapshot-time" id="barcode-stock-snapshot-time" hidden>库存更新时间：-</div>
             <label class="barcode-search-field" for="barcode-search-input">
                 <input class="barcode-search-input" id="barcode-search-input" type="search" placeholder="输入商品条码搜索">
             </label>

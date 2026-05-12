@@ -8,7 +8,7 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { Product, DurationResult, Stock, ReminderSettings, ReminderTimeUnit } from "../models/types";
 import { filterProductsByBarcodeSearch } from "../libs/barcode_search";
-import { formatDate, formatOptionalDate } from "../libs/date";
+import { formatDate, formatDateTime, formatOptionalDate } from "../libs/date";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
   markReturnedProductsExported,
@@ -298,6 +298,15 @@ function shouldLoadStocks(listType: ProductListType): boolean {
   );
 }
 
+function shouldShowStockSnapshotTime(listType: ProductListType): boolean {
+  return (
+    listType === "transfer" ||
+    listType === "return" ||
+    listType === "return-export" ||
+    listType === "stock-query"
+  );
+}
+
 function renderTableHead(listType: ProductListType): void {
   const tableHead = document.getElementById("product-table-head");
   if (!tableHead) return;
@@ -319,17 +328,51 @@ function updateReturnExportPanel(displayProducts: Product[]): void {
   }
 }
 
-function updateBarcodeSearchPanel(): void {
+function renderStockSnapshotTimeText(timestamp?: number): string {
+  return `库存更新时间：${formatOptionalDate(timestamp)}`;
+}
+
+function updateStockSnapshotTimeElement(
+  elementId: string,
+  stockSnapshotTime?: number,
+  visible = true,
+): void {
+  const element = document.getElementById(elementId);
+  if (!element) return;
+  element.textContent = renderStockSnapshotTimeText(stockSnapshotTime);
+  element.hidden = !visible;
+}
+
+async function loadStockSnapshotTime(): Promise<number | undefined> {
+  try {
+    const stocks = (await db.table(DB_TABLES.stock).limit(1).toArray()) as Stock[];
+    return stocks[0]?.lastUpdatedTime;
+  } catch (error) {
+    console.error("Failed to load stock snapshot time:", error);
+    showToast("库存更新时间加载失败", "error");
+    return undefined;
+  }
+}
+
+function updateBarcodeSearchPanel(stockSnapshotTime?: number): void {
   const panel = document.getElementById("barcode-search-panel") as HTMLDivElement | null;
   const input = document.getElementById("barcode-search-input") as HTMLInputElement | null;
-  const isSearchable = isBarcodeSearchListType(activeListType);
+  const listType = activeListType;
+  const isSearchable = isBarcodeSearchListType(listType);
+  const showStockSnapshotTime = isSearchable && shouldShowStockSnapshotTime(listType);
 
   if (panel) {
     panel.hidden = !isSearchable;
+    panel.classList.toggle("has-stock-snapshot-time", showStockSnapshotTime);
   }
+  updateStockSnapshotTimeElement(
+    "barcode-stock-snapshot-time",
+    stockSnapshotTime,
+    showStockSnapshotTime,
+  );
   if (!isSearchable) return;
 
-  const searchText = barcodeSearchByList[activeListType];
+  const searchText = barcodeSearchByList[listType];
   if (input && input.value !== searchText) {
     input.value = searchText;
   }
@@ -579,8 +622,11 @@ async function renderProducts(): Promise<void> {
   const tbody = document.getElementById("product-list");
   if (!tbody) return;
 
-  updateStockQueryPanel();
-  updateBarcodeSearchPanel();
+  const stockSnapshotTime = shouldShowStockSnapshotTime(activeListType)
+    ? await loadStockSnapshotTime()
+    : undefined;
+  updateStockQueryPanel(stockSnapshotTime);
+  updateBarcodeSearchPanel(stockSnapshotTime);
   renderTableHead(activeListType);
 
   const now = getCurrentTimestamp();
@@ -598,25 +644,26 @@ async function renderProducts(): Promise<void> {
     stocksByBarcode,
   );
   updateTabCounts(displayProductsByList);
-  const unsearchedDisplayProducts = displayProductsByList[activeListType];
-  const displayProducts = isBarcodeSearchListType(activeListType)
+  const listType = activeListType;
+  const unsearchedDisplayProducts = displayProductsByList[listType];
+  const displayProducts = isBarcodeSearchListType(listType)
     ? filterProductsByBarcodeSearch(
         unsearchedDisplayProducts,
-        barcodeSearchByList[activeListType],
+        barcodeSearchByList[listType],
       )
     : unsearchedDisplayProducts;
-  const rowStocksByBarcode = shouldLoadStocks(activeListType) ? stocksByBarcode : undefined;
+  const rowStocksByBarcode = shouldLoadStocks(listType) ? stocksByBarcode : undefined;
   updateReturnExportPanel(unsearchedDisplayProducts);
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="${getTableColumnCount(activeListType)}">
+        <td colspan="${getTableColumnCount(listType)}">
           <div class="empty-state">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
             </svg>
-            <p>${getEmptyText(activeListType)}</p>
+            <p>${getEmptyText(listType)}</p>
           </div>
         </td>
       </tr>
@@ -626,7 +673,7 @@ async function renderProducts(): Promise<void> {
 
   tbody.innerHTML = displayProducts
     .map((product: Product, index: number) =>
-      renderProductRow(product, activeListType, index, rowStocksByBarcode),
+      renderProductRow(product, listType, index, rowStocksByBarcode),
     )
     .join("");
   bindProductEvents();
@@ -685,11 +732,16 @@ function readStockQueryRange(): StockQueryRange {
   return createStockQueryRange(startDate, endDate);
 }
 
-function updateStockQueryPanel(): void {
+function updateStockQueryPanel(stockSnapshotTime?: number): void {
   const panel = document.getElementById("stock-query-panel") as HTMLDivElement | null;
   if (panel) {
     panel.hidden = activeListType !== "stock-query";
   }
+  updateStockSnapshotTimeElement(
+    "stock-query-snapshot-time",
+    stockSnapshotTime,
+    activeListType === "stock-query",
+  );
 }
 
 async function handleStockQuerySubmit(): Promise<void> {
@@ -1175,8 +1227,9 @@ function initEventListeners(): void {
   const barcodeSearchInput = document.getElementById("barcode-search-input") as HTMLInputElement | null;
   if (barcodeSearchInput) {
     barcodeSearchInput.addEventListener("input", () => {
-      if (!isBarcodeSearchListType(activeListType)) return;
-      barcodeSearchByList[activeListType] = barcodeSearchInput.value;
+      const listType = activeListType;
+      if (!isBarcodeSearchListType(listType)) return;
+      barcodeSearchByList[listType] = barcodeSearchInput.value;
       renderProducts().catch((error) => {
         showToast(getErrorMessage(error), "error");
       });
