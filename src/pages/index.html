@@ -10,7 +10,10 @@
     <div class="container">
         <div class="header">
             <h1>商品动销管理</h1>
-            <p>AI Agent 商品全流程跟踪系统</p>
+            <p class="header-subtitle">
+                <span>AI Agent 商品全流程跟踪系统</span>
+                <button class="manual-entry-btn" id="manual-entry-btn" type="button">用户手册</button>
+            </p>
         </div>
 
         <div class="list-toolbar">
@@ -188,6 +191,63 @@
                     <button class="btn btn-primary" id="settings-save-btn" type="submit">保存</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 用户手册弹窗 -->
+    <div class="modal" id="manual-modal">
+        <div class="modal-content manual-modal-content">
+            <div class="manual-modal-header">
+                <div class="modal-title">用户手册</div>
+                <button class="manual-close-btn" id="manual-close-icon-btn" type="button" aria-label="关闭用户手册">×</button>
+            </div>
+            <div class="manual-body">
+                <section class="manual-section">
+                    <h2>快速开始</h2>
+                    <p>每天主要查看上新提醒、调货提醒和回库提醒三个列表，按列表中的操作按钮处理商品。需要重新读取本地数据时点击刷新；库存查询用于按建档日期查找当前仍有正库存的商品。</p>
+                </section>
+
+                <section class="manual-section">
+                    <h2>自动数据更新</h2>
+                    <p>系统会通过有赞报表导入商品和库存数据。调货提醒、回库提醒、回库导出和库存查询中会显示库存更新时间；点击刷新只会重新读取本地数据库，不会触发有赞报表导入。</p>
+                </section>
+
+                <section class="manual-section">
+                    <h2>提醒列表怎么处理</h2>
+                    <ul>
+                        <li>上新提醒：商品建档达到提醒时间后进入列表。点击上新会标记为已上新；点击3天后提醒会暂时移出列表，到期后再次出现。</li>
+                        <li>调货提醒：已上新商品达到调货提醒时间且当前有正库存时进入列表。点击调货会标记为已调货；点击1周后提醒会按设置次数推后。</li>
+                        <li>回库提醒：已上新或已调货商品达到回库提醒时间且当前有正库存时进入列表。点击回库会标记为已回库；点击1周后提醒会按设置次数推后。</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section">
+                    <h2>回库导出</h2>
+                    <p>回库导出列表展示已回库且当前仍有正库存的商品。点击导出Excel后，系统会按门店分别生成 Excel 文件并打包为 zip；确认文件已成功保存后，参与导出的商品会变为已导出。</p>
+                </section>
+
+                <section class="manual-section">
+                    <h2>库存查询</h2>
+                    <p>库存查询需要同时选择建档开始日期和结束日期。查询结果只包含建档时间在日期范围内、且当前库存快照中存在正库存的商品。</p>
+                </section>
+
+                <section class="manual-section">
+                    <h2>参数设置</h2>
+                    <p>参数设置可以配置上新、调货、回库首次提醒时间，调货提醒截止时间，强制回库时间，以及调货和回库最大推后次数。已经推后过的提醒时间是固定时间点，修改参数后不会重新计算。</p>
+                </section>
+
+                <section class="manual-section">
+                    <h2>注意事项</h2>
+                    <ul>
+                        <li>条码搜索只过滤当前列表已经能展示的商品，不会扩大提醒规则或库存筛选范围。</li>
+                        <li>没有正库存的商品不会出现在调货提醒、回库提醒、回库导出和库存查询列表中。</li>
+                        <li>商品状态只能通过对应列表中的按钮流转，不能绕过提醒列表直接修改。</li>
+                    </ul>
+                </section>
+            </div>
+            <div class="modal-actions manual-modal-actions">
+                <button class="btn btn-secondary" id="manual-close-btn" type="button">关闭</button>
+            </div>
         </div>
     </div>
 

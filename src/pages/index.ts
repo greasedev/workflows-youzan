@@ -1032,6 +1032,20 @@ function closeSettingsModal(): void {
   }
 }
 
+function openManualModal(): void {
+  const modal = document.getElementById("manual-modal");
+  if (modal) {
+    modal.classList.add("active");
+  }
+}
+
+function closeManualModal(): void {
+  const modal = document.getElementById("manual-modal");
+  if (modal) {
+    modal.classList.remove("active");
+  }
+}
+
 async function handleSettingsSubmit(event: SubmitEvent): Promise<void> {
   event.preventDefault();
   const saveBtn = document.getElementById("settings-save-btn") as HTMLButtonElement | null;
@@ -1200,6 +1214,11 @@ function initEventListeners(): void {
     settingsEntryBtn.addEventListener("click", openSettingsModal);
   }
 
+  const manualEntryBtn = document.getElementById("manual-entry-btn");
+  if (manualEntryBtn) {
+    manualEntryBtn.addEventListener("click", openManualModal);
+  }
+
   const refreshListBtn = document.getElementById("refresh-list-btn") as HTMLButtonElement | null;
   if (refreshListBtn) {
     refreshListBtn.addEventListener("click", async () => {
@@ -1257,6 +1276,25 @@ function initEventListeners(): void {
   const settingsCancelBtn = document.getElementById("settings-cancel-btn");
   if (settingsCancelBtn) {
     settingsCancelBtn.addEventListener("click", closeSettingsModal);
+  }
+
+  const manualModal = document.getElementById("manual-modal");
+  if (manualModal) {
+    manualModal.addEventListener("click", (e: MouseEvent) => {
+      if (e.target === manualModal) {
+        closeManualModal();
+      }
+    });
+  }
+
+  const manualCloseBtn = document.getElementById("manual-close-btn");
+  if (manualCloseBtn) {
+    manualCloseBtn.addEventListener("click", closeManualModal);
+  }
+
+  const manualCloseIconBtn = document.getElementById("manual-close-icon-btn");
+  if (manualCloseIconBtn) {
+    manualCloseIconBtn.addEventListener("click", closeManualModal);
   }
 
   const settingsForm = document.getElementById("settings-form");
