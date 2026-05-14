@@ -14,7 +14,7 @@
  */
 
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
-import { createWorkflowApis, type ExecutionResult } from "../api";
+import { createWorkflowApis, type ExecutionResult, type WorkflowApis } from "../api";
 import { DB_TABLES, initDB } from "../libs/db";
 import { getCurrentTimestamp, SECONDS_PER_DAY } from "../libs/reminders";
 import { loadReminderSettings } from "../libs/settings";
@@ -22,6 +22,15 @@ import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
 import type { Product, ReminderSettings, Stock } from "../models/types";
 
 type ReportType = "product" | "stock";
+
+export const AUTH_REQUIRED_MESSAGE = "auth-required";
+
+export class AuthRequiredError extends Error {
+  constructor() {
+    super(AUTH_REQUIRED_MESSAGE);
+    this.name = "AuthRequiredError";
+  }
+}
 
 interface ImportStats {
   reportType: ReportType;
@@ -65,6 +74,10 @@ export function parseReportUrls(result: ExecutionResult): string[] {
 
   if (!Array.isArray(rawReportList)) {
     throw new Error("报表 URL 列表必须是数组");
+  }
+
+  if (String(rawReportList[0]).trim() === AUTH_REQUIRED_MESSAGE) {
+    throw new AuthRequiredError();
   }
 
   const urls = rawReportList
@@ -270,6 +283,66 @@ export async function importStockReports(
   return stats;
 }
 
+async function importReportsAndForceReturn(
+  db: any,
+  apis: Pick<WorkflowApis, "get_goods_report" | "get_stock_report">,
+): Promise<ImportWorkflowData> {
+  // 导入商品数据
+  console.log("Importing product data...");
+  const goodsReportResult = await apis.get_goods_report();
+  const productStats = await importProductReports(db, goodsReportResult);
+
+  // 导入库存数据
+  console.log("Importing stock data...");
+  const stockReportResult = await apis.get_stock_report();
+  const stockStats = await importStockReports(db, stockReportResult);
+
+  // 强制回库流程
+  console.log("Forcing return of overdue products...");
+  const settings = await loadReminderSettings(db);
+  const forceReturnCount = await forceReturnOverdueProducts(
+    db,
+    settings,
+    getCurrentTimestamp(),
+  );
+
+  return {
+    product: productStats,
+    stock: stockStats,
+    forceReturnCount,
+  } satisfies ImportWorkflowData;
+}
+
+export async function executeImportWorkflow(
+  db: any,
+  apis: Pick<WorkflowApis, "get_goods_report" | "get_stock_report">,
+) {
+  try {
+    const data = await importReportsAndForceReturn(db, apis);
+
+    return {
+      success: true,
+      message: "Workflow completed successfully",
+      data,
+    };
+  } catch (error) {
+    if (error instanceof AuthRequiredError) {
+      return {
+        success: true,
+        message: AUTH_REQUIRED_MESSAGE,
+        data: null,
+      };
+    }
+
+    console.error("Workflow error:", error);
+    return {
+      success: false,
+      message: "Workflow failed",
+      error: error,
+    };
+  }
+}
+
 // 工作流入口
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
@@ -280,43 +353,7 @@ export async function execute(context: WorkflowContext) {
   console.log("Params:", context.params);
   console.log("Executing workflow...");
 
-  try {
-    // 导入商品数据
-    console.log("Importing product data...");
-    const goodsReportResult = await apis.get_goods_report();
-    const productStats = await importProductReports(db, goodsReportResult);
-
-    // 导入库存数据
-    console.log("Importing stock data...");
-    const stockReportResult = await apis.get_stock_report();
-    const stockStats = await importStockReports(db, stockReportResult);
-
-    // 强制回库流程
-    console.log("Forcing return of overdue products...");
-    const settings = await loadReminderSettings(db);
-    const forceReturnCount = await forceReturnOverdueProducts(
-      db,
-      settings,
-      getCurrentTimestamp(),
-    );
-
-    return {
-      success: true,
-      message: "Workflow completed successfully",
-      data: {
-        product: productStats,
-        stock: stockStats,
-        forceReturnCount,
-      } satisfies ImportWorkflowData,
-    };
-  } catch (error) {
-    console.error("Workflow error:", error);
-    return {
-      success: false,
-      message: "Workflow failed",
-      error: error,
-    };
-  }
+  return executeImportWorkflow(db, apis);
 }
 // @ts-ignore
 globalThis.execute = execute;

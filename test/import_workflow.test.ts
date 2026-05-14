@@ -5,6 +5,9 @@ import * as XLSX from "xlsx";
 import { DB_TABLES } from "../src/libs/db";
 import type { ExecutionResult } from "../src/api";
 import {
+  AUTH_REQUIRED_MESSAGE,
+  AuthRequiredError,
+  executeImportWorkflow,
   forceReturnOverdueProducts,
   importProductReports,
   importStockReports,
@@ -99,6 +102,46 @@ test("报表 URL 解析会去空、去重，并按 type + url 区分已导入报
     newUrls: ["same.xlsx"],
     skippedReports: 0,
   });
+});
+
+test("报表 URL 第一项为 auth-required 时抛出认证异常", () => {
+  assert.throws(
+    () => parseReportUrls(resultWithUrls([AUTH_REQUIRED_MESSAGE])),
+    AuthRequiredError,
+  );
+  assert.throws(
+    () => parseReportUrls(resultWithUrls([` ${AUTH_REQUIRED_MESSAGE} `])),
+    AuthRequiredError,
+  );
+  assert.deepEqual(
+    parseReportUrls(resultWithUrls(["a.xlsx", AUTH_REQUIRED_MESSAGE])),
+    ["a.xlsx", AUTH_REQUIRED_MESSAGE],
+  );
+});
+
+test("导入 workflow 遇到 auth-required 时返回成功并停止后续步骤", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  await db.table(DB_TABLES.product).add(
+    productFactory({ barcode: "LISTED-OVERDUE", status: "listed", listedTime: daysAgo(57) }),
+  );
+
+  let stockReportCalls = 0;
+  const result = await executeImportWorkflow(db, {
+    get_goods_report: async () => resultWithUrls([AUTH_REQUIRED_MESSAGE]),
+    get_stock_report: async () => {
+      stockReportCalls += 1;
+      return resultWithUrls(["stocks.xlsx"]);
+    },
+  });
+
+  assert.deepEqual(result, {
+    success: true,
+    message: AUTH_REQUIRED_MESSAGE,
+    data: null,
+  });
+  assert.equal(stockReportCalls, 0);
+  assert.equal((await getProduct(db, "LISTED-OVERDUE")).status, "listed");
 });
 
 test("重复导入已有商品只更新基础信息，不覆盖业务状态和时间字段", async (t) => {
