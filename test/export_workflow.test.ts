@@ -2,8 +2,10 @@ import "fake-indexeddb/auto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { DB_TABLES } from "../src/libs/db";
+import { AUTH_REQUIRED_MESSAGE } from "../src/libs/auth_required";
 import {
   executeExportWorkflow,
+  executeExportWorkflowWithHandling,
   getGoodsExportRange,
 } from "../src/workflows/export_workflow";
 import type { ExecutionResult } from "../src/api";
@@ -26,6 +28,19 @@ function failureResult(error = "failed"): ExecutionResult {
   return {
     success: false,
     error,
+  };
+}
+
+function resultWithExtractData(extractData: string): ExecutionResult {
+  return {
+    success: true,
+    task: {
+      id: "task-1",
+      status: "succeeded",
+      extract_data: extractData,
+      metrics_tokens: 0,
+      metrics_time: 0,
+    },
   };
 }
 
@@ -113,6 +128,60 @@ test("export_workflow 使用 product 表最大 createdTime 调用商品导出和
 
   assert.equal(data.goodsExportSkipped, false);
   assert.deepEqual(apiHarness.goodsCalls, [["2026-05-03 08:30:01", "2026-05-06 12:00:00"]]);
+  assert.equal(apiHarness.stockCalls, 1);
+});
+
+test("export_goods 返回 auth-required 时 workflow 成功短路且不继续导出库存", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  const apiHarness = createApis({
+    goodsResult: resultWithExtractData(JSON.stringify([AUTH_REQUIRED_MESSAGE])),
+  });
+
+  const result = await executeExportWorkflowWithHandling(db, apiHarness.apis, referenceDate);
+
+  assert.deepEqual(result, {
+    success: true,
+    message: AUTH_REQUIRED_MESSAGE,
+    data: null,
+  });
+  assert.equal(apiHarness.goodsCalls.length, 1);
+  assert.equal(apiHarness.stockCalls, 0);
+});
+
+test("export_stock 返回 auth-required 时 workflow 返回成功认证态", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  const apiHarness = createApis({
+    stockResult: resultWithExtractData(JSON.stringify([` ${AUTH_REQUIRED_MESSAGE} `])),
+  });
+
+  const result = await executeExportWorkflowWithHandling(db, apiHarness.apis, referenceDate);
+
+  assert.deepEqual(result, {
+    success: true,
+    message: AUTH_REQUIRED_MESSAGE,
+    data: null,
+  });
+  assert.equal(apiHarness.goodsCalls.length, 1);
+  assert.equal(apiHarness.stockCalls, 1);
+});
+
+test("auth-required 不在第一项时导出 workflow 不触发认证态", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  const apiHarness = createApis({
+    goodsResult: resultWithExtractData(JSON.stringify(["ok", AUTH_REQUIRED_MESSAGE])),
+  });
+
+  const result = await executeExportWorkflowWithHandling(db, apiHarness.apis, referenceDate);
+
+  assert.equal(result.success, true);
+  assert.equal(result.message, "Workflow completed successfully");
+  assert.equal(apiHarness.goodsCalls.length, 1);
   assert.equal(apiHarness.stockCalls, 1);
 });
 

@@ -15,6 +15,11 @@
 
 import { Agent, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis, type ExecutionResult, type WorkflowApis } from "../api";
+import {
+  AUTH_REQUIRED_MESSAGE,
+  AuthRequiredError,
+  isAuthRequiredExtractData,
+} from "../libs/auth_required";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
   formatDateTime,
@@ -35,6 +40,10 @@ interface GoodsExportRange {
 interface ExportWorkflowData extends GoodsExportRange {}
 
 function assertApiSuccess(result: ExecutionResult, actionName: string): void {
+  if (isAuthRequiredExtractData(result.task?.extract_data)) {
+    throw new AuthRequiredError();
+  }
+
   if (!result.success) {
     throw new Error(`${actionName} failed${result.error ? `: ${result.error}` : ""}`);
   }
@@ -88,6 +97,37 @@ export async function executeExportWorkflow(
   return range;
 }
 
+export async function executeExportWorkflowWithHandling(
+  db: ExportWorkflowDb,
+  apis: Pick<WorkflowApis, "export_goods" | "export_stock">,
+  referenceDate = new Date(Date.now()),
+) {
+  try {
+    const data = await executeExportWorkflow(db, apis, referenceDate);
+
+    return {
+      success: true,
+      message: "Workflow completed successfully",
+      data,
+    };
+  } catch (error) {
+    if (error instanceof AuthRequiredError) {
+      return {
+        success: true,
+        message: AUTH_REQUIRED_MESSAGE,
+        data: null,
+      };
+    }
+
+    console.error("Workflow error:", error);
+    return {
+      success: false,
+      message: "Workflow failed",
+      error: error,
+    };
+  }
+}
+
 // 工作流入口
 export async function execute(context: WorkflowContext) {
   const agent = new Agent(context.agentOptions || {});
@@ -98,22 +138,7 @@ export async function execute(context: WorkflowContext) {
   console.log("Params:", context.params);
   console.log("Executing workflow...");
 
-  try {
-    const data = await executeExportWorkflow(db, apis);
-
-    return {
-      success: true,
-      message: "Workflow completed successfully",
-      data,
-    };
-  } catch (error) {
-    console.error("Workflow error:", error);
-    return {
-      success: false,
-      message: "Workflow failed",
-      error: error,
-    };
-  }
+  return executeExportWorkflowWithHandling(db, apis);
 }
 // @ts-ignore
 globalThis.execute = execute;

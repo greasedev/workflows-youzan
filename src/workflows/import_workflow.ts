@@ -15,6 +15,7 @@
 
 import { Agent, Dexie, type WorkflowContext } from "@greaseclaw/workflow-sdk";
 import { createWorkflowApis, type ExecutionResult, type WorkflowApis } from "../api";
+import { AUTH_REQUIRED_MESSAGE, AuthRequiredError } from "../libs/auth_required";
 import { DB_TABLES, initDB } from "../libs/db";
 import { getCurrentTimestamp, SECONDS_PER_DAY } from "../libs/reminders";
 import { loadReminderSettings } from "../libs/settings";
@@ -22,15 +23,6 @@ import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
 import type { Product, ReminderSettings, Stock } from "../models/types";
 
 type ReportType = "product" | "stock";
-
-export const AUTH_REQUIRED_MESSAGE = "auth-required";
-
-export class AuthRequiredError extends Error {
-  constructor() {
-    super(AUTH_REQUIRED_MESSAGE);
-    this.name = "AuthRequiredError";
-  }
-}
 
 interface ImportStats {
   reportType: ReportType;

@@ -3,10 +3,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as XLSX from "xlsx";
 import { DB_TABLES } from "../src/libs/db";
+import { AUTH_REQUIRED_MESSAGE, AuthRequiredError } from "../src/libs/auth_required";
 import type { ExecutionResult } from "../src/api";
 import {
-  AUTH_REQUIRED_MESSAGE,
-  AuthRequiredError,
   executeImportWorkflow,
   forceReturnOverdueProducts,
   importProductReports,
