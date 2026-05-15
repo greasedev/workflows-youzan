@@ -37,7 +37,10 @@ import {
   isProductInStockQueryRange,
   type StockQueryRange,
 } from "../libs/stock_query";
-import { filterProductsWithPositiveStock } from "../libs/stocks";
+import {
+  filterProductsWithPositiveStock,
+  sumPositiveStockForProducts,
+} from "../libs/stocks";
 
 // 扩展 Window 类型以包含 agentOptions
 declare global {
@@ -307,12 +310,34 @@ function shouldShowStockSnapshotTime(listType: ProductListType): boolean {
   );
 }
 
-function renderTableHead(listType: ProductListType): void {
+function getColumnTitle(
+  listType: ProductListType,
+  column: TableColumn,
+  stockQueryTotal?: number,
+): string {
+  if (
+    listType === "stock-query" &&
+    column.title === "门店库存" &&
+    stockQueryTotal !== undefined
+  ) {
+    return `门店库存（总数：${stockQueryTotal}）`;
+  }
+  return column.title;
+}
+
+function renderTableHead(listType: ProductListType, stockQueryTotal?: number): void {
   const tableHead = document.getElementById("product-table-head");
   if (!tableHead) return;
 
   tableHead.innerHTML = TABLE_COLUMNS[listType]
-    .map((column) => `<th style="width: ${column.width}px;">${column.title}</th>`)
+    .map(
+      (column) =>
+        `<th style="width: ${column.width}px;">${getColumnTitle(
+          listType,
+          column,
+          stockQueryTotal,
+        )}</th>`,
+    )
     .join("");
 }
 
@@ -624,7 +649,6 @@ async function renderProducts(): Promise<void> {
     : undefined;
   updateStockQueryPanel(stockSnapshotTime);
   updateBarcodeSearchPanel(stockSnapshotTime);
-  renderTableHead(activeListType);
 
   const now = getCurrentTimestamp();
   const allProducts = (await db.table(DB_TABLES.product).toArray()) as Product[];
@@ -651,6 +675,11 @@ async function renderProducts(): Promise<void> {
     : unsearchedDisplayProducts;
   const rowStocksByBarcode = shouldLoadStocks(listType) ? stocksByBarcode : undefined;
   updateReturnExportPanel(unsearchedDisplayProducts);
+  const stockQueryTotal =
+    listType === "stock-query" && displayProducts.length > 0
+      ? sumPositiveStockForProducts(displayProducts, stocksByBarcode)
+      : undefined;
+  renderTableHead(listType, stockQueryTotal);
 
   if (displayProducts.length === 0) {
     tbody.innerHTML = `
