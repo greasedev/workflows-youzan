@@ -8,7 +8,7 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import { Product, DurationResult, Stock, ReminderSettings, ReminderTimeUnit } from "../models/types";
 import { filterProductsByBarcodeSearch } from "../libs/barcode_search";
-import { formatDate, formatDateTime, formatOptionalDate } from "../libs/date";
+import { formatDate, formatOptionalDate } from "../libs/date";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
   markReturnedProductsExported,
