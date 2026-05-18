@@ -1,6 +1,6 @@
 # Codex 实现计划
 
-本文档基于 `docs/prd.md` 制定，用于指导后续代码实现。当前已实现商品提醒流程为：数据导入、商品/库存报表导出、三类提醒列表、受约束的状态流转、推后提醒、回库导出、库存查询和参数设置。周统计仅保留纯函数实现，workflow 当前未启用。
+本文档基于 `docs/prd.md` 制定，用于指导后续代码实现。当前已实现商品提醒流程为：数据导入、销售自动上新、商品/库存报表导出、三类提醒列表、受约束的状态流转、推后提醒、回库导出、库存查询和参数设置。周统计仅保留纯函数实现，workflow 当前未启用。
 
 ## 当前开发进展
 
@@ -10,6 +10,11 @@
   - 每次导入 workflow 在商品和库存数据导入完成后扫描 `listed` / `transferred` 商品。
   - 默认上新超过 8 周后自动更新为 `returned` 并写入 `returnedTime`。
   - 强制回库时间由参数设置驱动，默认 8 周。
+- 已完成销售报表导入自动上新：
+  - 导入 workflow 在商品报表导入后、库存报表导入前处理销售报表。
+  - 销售报表按 `type = "sales"` 与 URL 写入 `report` 表去重。
+  - 销售数据按商品条码匹配 `product` 表，匹配到 `pending` 商品时自动更新为 `listed` 并写入 `listedTime`。
+  - 销售数据不入库，只作为自动上新触发源。
 - 已完成调货/回库提醒列表正库存展示门槛：
   - 调货/回库页面列表和 tab 数量只包含当前库存快照中存在同 `barcode` 且 `stock > 0` 的商品。
   - 该规则只影响页面列表和数量，不改变周统计纯函数和状态流转动作函数。
@@ -67,6 +72,7 @@ pnpm run build:pages
 - 以 `barcode` 作为商品唯一业务标识。
 - 新商品导入时初始化为 `pending`；已有商品导入时只更新基础信息，不修改 `status`、`createdTime` 和业务时间字段。
 - 商品导入时 `创建时间` 缺失或解析失败，使用导入执行日期的前一天 `23:59:59` 作为兜底值。
+- 销售报表导入在商品报表导入之后执行；销售数据匹配到 `pending` 商品时直接自动上新，不受上新提醒时间限制。
 - 库存数据按全量快照导入；只处理 `extract_data` 中第一个有效库存 xlsx；没有新库存报表时保留旧库存。
 - `export_workflow` 使用 `settings` 表独立记录维护销售报表 checkpoint；商品报表使用本地 `product.createdTime` 最大值作为补导水位，不额外维护 checkpoint。
 - 所有状态流转只能由页面中对应提醒列表的按钮触发。
@@ -171,10 +177,14 @@ pnpm run build:pages
   - 商品条码(SPU) -> `barcode`
   - 门店/仓库 -> `store`
   - 实物库存 -> `stock`
+- 将销售 Excel 字段映射到 PRD 字段：
+  - 商品条码 -> `barcode`
+  - 商品销售数量 -> `quantity`
 - 库存 `lastUpdatedTime` 使用库存报表导入合并时的当前时间。
-- 拆分商品 XLSX 和库存 XLSX 解析封装。
+- 拆分商品、销售和库存 XLSX 解析封装。
 - `fetchAndParseXlsx` 支持传入 mapper 和 filter：
   - 商品解析过滤 `barcode` 存在的行。
+  - 销售解析过滤 `barcode` 存在且 `quantity > 0` 的行。
   - 库存解析过滤 `barcode` 存在且 `stock > 0` 的行。
 - 商品解析时，`创建时间` 缺失或解析失败不跳过整行，`createdTime` 使用导入执行日期的前一天 `23:59:59`。
 - 新商品插入时：
@@ -194,12 +204,20 @@ pnpm run build:pages
   - 正好等于强制回库时间时不更新。
   - 返回结果包含 `forceReturnCount`。
 - 使用 `barcode` 查重，不再依赖非 PRD 字段。
-- 商品和库存报表按 `type + url` 去重。
+- 商品、销售和库存报表按 `type + url` 去重。
 - 报表 URL 解析规则：
   - API 返回失败或没有 `task` 时，按没有新报表处理。
   - `task.extract_data` 为空或缺失时，按空 URL 列表处理。
   - 非空 `task.extract_data` 必须是合法 JSON 数组，否则导入 workflow 失败。
   - 数组元素按 `String(item).trim()` 处理，过滤空字符串并去重。
+- 销售导入处理：
+  - 处理所有未导入过的销售报表 URL。
+  - 每条销售数据按 `barcode` 查询 `product` 表。
+  - 未找到商品时跳过。
+  - 商品状态不是 `pending` 时跳过，不覆盖已有状态或业务时间。
+  - 商品状态为 `pending` 时，写入 `status = "listed"` 和 `listedTime = 当前时间`。
+  - 销售报表处理完成后写入 `report` 表标记为已导入。
+  - 销售数据不写入数据库。
 - 库存导入按全量快照处理：
   - 只取 `task.extract_data` 解析、清洗、去重后的第一个有效 URL 作为最新库存快照。
   - 最新库存报表未导入过时，先解析该 xlsx；解析成功后在同一个事务中清空 `stock` 表并批量写入。
@@ -217,6 +235,9 @@ pnpm run build:pages
 - 重复导入同一个商品不会重置业务状态。
 - 已上新、已调货、已回库商品再次导入后仍保持原业务状态。
 - `createdTime` 始终保留首次导入时的值。
+- 销售报表能将匹配到的 `pending` 商品自动更新为 `listed`。
+- 销售报表不会修改非 `pending` 商品，也不会为不存在的商品创建记录。
+- 销售报表 URL 按 `type = "sales"` 去重，且不影响商品和库存报表同 URL 去重。
 - 每次导入 workflow 都会在所有数据导入完成后强制回库超期已上新/已调货商品。
 - 强制回库只写入 `status` 和 `returnedTime`，不覆盖其他业务时间和提醒字段。
 - 只导入 `stock > 0` 的库存记录。

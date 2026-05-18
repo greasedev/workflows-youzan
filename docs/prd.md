@@ -120,7 +120,7 @@ export interface ReminderSettings {
 
 ### 商品导入
 
-- `import_workflow` 每天 08:30 定时执行，先处理商品报表，再处理库存报表，最后执行强制回库扫描。
+- `import_workflow` 每天 08:30 定时执行，先处理商品报表，再处理销售报表，然后处理库存报表，最后执行强制回库扫描。
 - 商品报表字段映射：
   - 商品名称 -> `name`
   - 商品条码 -> `barcode`
@@ -136,6 +136,21 @@ export interface ReminderSettings {
   - 不允许更新 `createdTime`。
   - 不允许清空或覆盖 `listedTime`、`transferredTime`、`returnedTime`、提醒时间和提醒次数。
 - 每次导入 workflow 在商品和库存数据导入完成后，都会按最新参数扫描现有商品；`status` 为 `listed` 或 `transferred`、`listedTime` 不为空，且 当前时间 - `listedTime` > 参数设置中的强制回库时间时，强制更新为 `status = "returned"` 并写入 `returnedTime = 当前时间`。正好等于强制回库时间时不强制回库。
+
+### 销售导入
+
+- 销售报表字段映射：
+  - 商品条码 -> `barcode`
+  - 商品销售数量 -> `quantity`
+- 只处理 `barcode` 存在且 `quantity > 0` 的销售记录。
+- 销售报表 URL 使用 `report` 表按 `type = "sales"` 与 `url` 去重；商品、库存、销售同 URL 互不影响。
+- 销售报表导入在商品报表导入之后、库存报表导入之前执行。
+- 每条销售记录按 `barcode` 查询 `product` 表：
+  - 未找到商品时跳过。
+  - 找到商品但 `status !== "pending"` 时跳过，不覆盖已有状态或业务时间。
+  - 找到商品且 `status === "pending"` 时自动上新，写入 `status = "listed"` 和 `listedTime = 当前时间`。
+- 自动上新只要求商品当前为 `pending`，不校验是否已经进入上新提醒列表。
+- 销售数据不写入数据库，只作为自动上新的触发源。
 
 ### 库存导入
 
@@ -154,9 +169,9 @@ export interface ReminderSettings {
 
 ### 报表去重
 
-- 商品和库存导入共用报表去重机制。
-- `report` 按 `type + url` 去重，避免商品报表和库存报表互相影响。
-- `get_goods_report` / `get_stock_report` 返回失败或没有 `task` 时，按没有新报表处理。
+- 商品、销售和库存导入共用报表去重机制。
+- `report` 按 `type + url` 去重，避免商品报表、销售报表和库存报表互相影响。
+- `get_goods_report` / `get_sales_report` / `get_stock_report` 返回失败或没有 `task` 时，按没有新报表处理。
 - `task.extract_data` 为空字符串或缺失时，按空 URL 列表处理。
 - `task.extract_data` 非空但不是合法 JSON，或 JSON 解析结果不是数组时，导入 workflow 失败，不继续后续导入步骤。
 - URL 数组元素会按 `String(item).trim()` 处理，过滤空字符串并去重。

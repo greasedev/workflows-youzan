@@ -19,10 +19,14 @@ import { AUTH_REQUIRED_MESSAGE, AuthRequiredError } from "../libs/auth_required"
 import { DB_TABLES, initDB } from "../libs/db";
 import { getCurrentTimestamp, SECONDS_PER_DAY } from "../libs/reminders";
 import { loadReminderSettings } from "../libs/settings";
-import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../libs/xlsx";
-import type { Product, ReminderSettings, Stock } from "../models/types";
+import {
+  fetchAndParseProductXlsx,
+  fetchAndParseSalesXlsx,
+  fetchAndParseStockXlsx,
+} from "../libs/xlsx";
+import type { Product, ReminderSettings, Sales, Stock } from "../models/types";
 
-type ReportType = "product" | "stock";
+type ReportType = "product" | "stock" | "sales";
 
 interface ImportStats {
   reportType: ReportType;
@@ -38,6 +42,7 @@ interface ReportUrlScan {
 
 interface ImportWorkflowData {
   product: ImportStats;
+  sales: ImportStats;
   stock: ImportStats;
   forceReturnCount: number;
 }
@@ -182,6 +187,56 @@ export async function importProductReports(
   return stats;
 }
 
+async function autoListSoldProduct(
+  db: any,
+  sale: Sales,
+  now = getCurrentTimestamp(),
+): Promise<boolean> {
+  let updated = false;
+
+  await db.transaction("rw", db.table(DB_TABLES.product), async () => {
+    const product = (await db
+      .table(DB_TABLES.product)
+      .where("barcode")
+      .equals(sale.barcode)
+      .first()) as Product | undefined;
+
+    if (!product?.id || product.status !== "pending") return;
+
+    await db.table(DB_TABLES.product).update(product.id, {
+      status: "listed",
+      listedTime: now,
+    });
+    updated = true;
+  });
+
+  return updated;
+}
+
+export async function importSalesReports(
+  db: any,
+  result: ExecutionResult,
+  now = getCurrentTimestamp(),
+): Promise<ImportStats> {
+  const stats = createImportStats("sales");
+  const { newUrls, skippedReports } = await scanNewReportUrls(db, "sales", result);
+  stats.skippedReports = skippedReports;
+
+  for (const url of newUrls) {
+    const salesRows = await fetchAndParseSalesXlsx(url);
+    for (const sale of salesRows) {
+      if (await autoListSoldProduct(db, sale, now)) {
+        stats.importedRows += 1;
+      }
+    }
+
+    await markReportImported(db, "sales", url);
+    stats.importedReports += 1;
+  }
+
+  return stats;
+}
+
 export async function forceReturnOverdueProducts(
   db: any,
   settings: ReminderSettings,
@@ -277,12 +332,17 @@ export async function importStockReports(
 
 async function importReportsAndForceReturn(
   db: any,
-  apis: Pick<WorkflowApis, "get_goods_report" | "get_stock_report">,
+  apis: Pick<WorkflowApis, "get_goods_report" | "get_sales_report" | "get_stock_report">,
 ): Promise<ImportWorkflowData> {
   // 导入商品数据
   console.log("Importing product data...");
   const goodsReportResult = await apis.get_goods_report();
   const productStats = await importProductReports(db, goodsReportResult);
+
+  // 导入销售数据并自动上新
+  console.log("Importing sales data...");
+  const salesReportResult = await apis.get_sales_report();
+  const salesStats = await importSalesReports(db, salesReportResult);
 
   // 导入库存数据
   console.log("Importing stock data...");
@@ -300,6 +360,7 @@ async function importReportsAndForceReturn(
 
   return {
     product: productStats,
+    sales: salesStats,
     stock: stockStats,
     forceReturnCount,
   } satisfies ImportWorkflowData;
@@ -307,7 +368,7 @@ async function importReportsAndForceReturn(
 
 export async function executeImportWorkflow(
   db: any,
-  apis: Pick<WorkflowApis, "get_goods_report" | "get_stock_report">,
+  apis: Pick<WorkflowApis, "get_goods_report" | "get_sales_report" | "get_stock_report">,
 ) {
   try {
     const data = await importReportsAndForceReturn(db, apis);
