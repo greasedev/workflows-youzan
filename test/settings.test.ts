@@ -4,9 +4,13 @@ import { DB_TABLES } from "../src/libs/db";
 import {
   DEFAULT_REMINDER_SETTINGS,
   loadReminderSettings,
+  loadSalesExportCheckpoint,
   normalizeReminderSettings,
+  normalizeSalesExportCheckpoint,
   REMINDER_SETTINGS_ID,
+  SALES_EXPORT_CHECKPOINT_ID,
   saveReminderSettings,
+  saveSalesExportCheckpoint,
 } from "../src/libs/settings";
 import { cleanupTestDb, createTestDb } from "./helpers/db";
 import { settingsFactory } from "./helpers/fixtures";
@@ -75,3 +79,46 @@ test("保存参数使用固定主键并可再次读取", async (t) => {
   assert.equal(rows[0].id, REMINDER_SETTINGS_ID);
 });
 
+test("没有销售导出 checkpoint 时读取为空", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+
+  assert.equal(await loadSalesExportCheckpoint(db), undefined);
+});
+
+test("销售导出 checkpoint normalize 会丢弃非法日期", () => {
+  assert.equal(
+    normalizeSalesExportCheckpoint({
+      id: SALES_EXPORT_CHECKPOINT_ID,
+      lastSuccessfulSalesExportDate: "2026-02-31",
+    }),
+    undefined,
+  );
+  assert.deepEqual(
+    normalizeSalesExportCheckpoint({
+      id: "wrong-id",
+      lastSuccessfulSalesExportDate: "2026-03-01",
+    }),
+    {
+      id: SALES_EXPORT_CHECKPOINT_ID,
+      lastSuccessfulSalesExportDate: "2026-03-01",
+    },
+  );
+});
+
+test("销售导出 checkpoint 使用独立主键并不被提醒设置覆盖", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const settings = settingsFactory({ listingReminderDays: 10 });
+
+  await saveSalesExportCheckpoint(db, "2026-05-10");
+  await saveReminderSettings(db, settings);
+
+  assert.deepEqual(await loadReminderSettings(db), settings);
+  assert.deepEqual(await loadSalesExportCheckpoint(db), {
+    id: SALES_EXPORT_CHECKPOINT_ID,
+    lastSuccessfulSalesExportDate: "2026-05-10",
+  });
+  const rows = await db.table(DB_TABLES.settings).toArray();
+  assert.equal(rows.length, 2);
+});

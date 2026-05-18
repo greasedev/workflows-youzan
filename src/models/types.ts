@@ -75,3 +75,8 @@ export interface ReminderSettings {
   maxTransferPostponeCount: number;
   maxReturnPostponeCount: number;
 }
+
+export interface SalesExportCheckpoint {
+  id: string;
+  lastSuccessfulSalesExportDate: string;
+}

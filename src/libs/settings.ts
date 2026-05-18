@@ -1,9 +1,11 @@
-import type { ReminderSettings, ReminderTimeUnit } from "../models/types";
+import type { ReminderSettings, ReminderTimeUnit, SalesExportCheckpoint } from "../models/types";
 import { DB_TABLES } from "./db";
+import { isDateString } from "./date";
 
 type SettingsDb = any;
 
 export const REMINDER_SETTINGS_ID = "reminder-settings";
+export const SALES_EXPORT_CHECKPOINT_ID = "sales-export-checkpoint";
 
 export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
   id: REMINDER_SETTINGS_ID,
@@ -82,6 +84,19 @@ export function normalizeReminderSettings(value: Partial<ReminderSettings> | und
   };
 }
 
+export function normalizeSalesExportCheckpoint(
+  value: Partial<SalesExportCheckpoint> | undefined,
+): SalesExportCheckpoint | undefined {
+  if (!isDateString(value?.lastSuccessfulSalesExportDate)) {
+    return undefined;
+  }
+
+  return {
+    id: SALES_EXPORT_CHECKPOINT_ID,
+    lastSuccessfulSalesExportDate: value.lastSuccessfulSalesExportDate,
+  };
+}
+
 export async function loadReminderSettings(db: SettingsDb): Promise<ReminderSettings> {
   const settings = (await db.table(DB_TABLES.settings).get(REMINDER_SETTINGS_ID)) as
     | Partial<ReminderSettings>
@@ -96,4 +111,29 @@ export async function saveReminderSettings(
   const normalizedSettings = normalizeReminderSettings(settings);
   await db.table(DB_TABLES.settings).put(normalizedSettings);
   return normalizedSettings;
+}
+
+export async function loadSalesExportCheckpoint(
+  db: SettingsDb,
+): Promise<SalesExportCheckpoint | undefined> {
+  const checkpoint = (await db.table(DB_TABLES.settings).get(SALES_EXPORT_CHECKPOINT_ID)) as
+    | Partial<SalesExportCheckpoint>
+    | undefined;
+  return normalizeSalesExportCheckpoint(checkpoint);
+}
+
+export async function saveSalesExportCheckpoint(
+  db: SettingsDb,
+  lastSuccessfulSalesExportDate: string,
+): Promise<SalesExportCheckpoint> {
+  const checkpoint = normalizeSalesExportCheckpoint({
+    id: SALES_EXPORT_CHECKPOINT_ID,
+    lastSuccessfulSalesExportDate,
+  });
+  if (!checkpoint) {
+    throw new Error(`Invalid sales export checkpoint date: ${lastSuccessfulSalesExportDate}`);
+  }
+
+  await db.table(DB_TABLES.settings).put(checkpoint);
+  return checkpoint;
 }

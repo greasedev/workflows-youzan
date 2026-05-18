@@ -98,7 +98,17 @@ export interface ReminderSettings {
 
 ### 有赞报表导出 workflow
 
-- `export_workflow` 每天 08:00 定时执行，用于触发有赞商品报表和库存报表导出。
+- `export_workflow` 每天 08:00 定时执行，用于触发有赞销售报表、商品报表和库存报表导出。
+- 销售报表导出排在最前面，调用 `export_sales`。
+- 销售报表导出时间范围：
+  - 如果 `settings` 表已有销售导出 checkpoint，开始日期为 checkpoint 中上次成功导出日期的次日。
+  - 如果没有销售导出 checkpoint，开始日期为 `2026-03-01`。
+  - 结束日期为昨天。
+  - 开始日期和结束日期使用 `YYYY-MM-DD` 格式。
+- 如果销售报表开始日期大于结束日期，跳过销售报表导出。
+- 销售报表导出成功后，将结束日期写入 `settings` 表独立记录，主键为 `sales-export-checkpoint`。
+- 销售报表普通失败时，不更新 checkpoint，继续执行商品和库存导出，并在 workflow 返回数据中记录销售导出失败信息。
+- 销售报表返回 `auth-required` 时，workflow 返回成功认证态且不继续执行商品和库存导出。
 - 商品报表导出时间范围：
   - 如果本地 `product` 表已有商品，开始时间为当前本地最大 `product.createdTime + 1 秒`。
   - 如果本地 `product` 表没有商品，开始时间为昨天 `00:00:00`。
@@ -106,7 +116,7 @@ export interface ReminderSettings {
 - 如果商品报表开始时间大于结束时间，跳过商品报表导出。
 - 无论商品报表是否跳过，库存报表仍每次执行导出一次。
 - `export_goods` 或 `export_stock` 返回失败时，workflow 返回失败。
-- workflow 返回数据中包含商品导出是否跳过、商品导出开始时间、商品导出结束时间和本地最大 `createdTime`，用于排查补导范围。
+- workflow 返回数据中包含销售导出是否跳过、销售导出是否成功、销售导出开始日期、销售导出结束日期、上次销售成功导出日期、商品导出是否跳过、商品导出开始时间、商品导出结束时间和本地最大 `createdTime`，用于排查补导范围。
 
 ### 商品导入
 

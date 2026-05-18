@@ -4,7 +4,7 @@
 
 ## 当前开发进展
 
-- 已完成商品导入、库存导入、商品/库存报表导出、三类提醒列表、状态流转、推后提醒、回库导出、库存查询、参数设置和周统计纯函数。
+- 已完成商品导入、库存导入、销售/商品/库存报表导出、三类提醒列表、状态流转、推后提醒、回库导出、库存查询、参数设置和周统计纯函数。
 - `src/workflows/weekly_stats_workflow.ts` 当前整文件注释，周统计 workflow 未启用，也不纳入当前自动化回归测试。
 - 已完成导入 workflow 强制回库处理：
   - 每次导入 workflow 在商品和库存数据导入完成后扫描 `listed` / `transferred` 商品。
@@ -41,7 +41,10 @@
   - 默认值为上新 3 周、调货 3 周、调货截止 6 周、回库 6 周、强制回库 8 周、调货最大推后 2 次、回库最大推后 2 次。
   - 页面列表过滤、列表排序、按钮显隐、状态流转校验和导入 workflow 强制回库都读取同一套参数。
   - 已推后的 `*RemindTime` 保持绝对时间，不因参数修改而重算。
-- 已完成商品报表导出补导规则：
+- 已完成销售和商品报表导出补导规则：
+  - 销售报表导出排在最前面，优先使用 `settings` 表中 `sales-export-checkpoint` 独立记录续导。
+  - 销售报表没有 checkpoint 时从 `2026-03-01` 开始，结束日期为昨天，日期格式为 `YYYY-MM-DD`。
+  - 销售报表导出成功后将昨天日期写回 checkpoint；普通失败不阻断商品和库存导出，认证态会短路 workflow。
   - 商品报表导出开始时间优先使用本地 `product` 表最大 `createdTime + 1 秒`。
   - 本地没有商品时，商品报表导出开始时间使用昨天 `00:00:00`。
   - 商品报表导出结束时间使用 workflow 执行时的当前时间。
@@ -65,7 +68,7 @@ pnpm run build:pages
 - 新商品导入时初始化为 `pending`；已有商品导入时只更新基础信息，不修改 `status`、`createdTime` 和业务时间字段。
 - 商品导入时 `创建时间` 缺失或解析失败，使用导入执行日期的前一天 `23:59:59` 作为兜底值。
 - 库存数据按全量快照导入；只处理 `extract_data` 中第一个有效库存 xlsx；没有新库存报表时保留旧库存。
-- `export_workflow` 使用本地 `product.createdTime` 最大值作为商品报表补导水位，不额外维护 checkpoint。
+- `export_workflow` 使用 `settings` 表独立记录维护销售报表 checkpoint；商品报表使用本地 `product.createdTime` 最大值作为补导水位，不额外维护 checkpoint。
 - 所有状态流转只能由页面中对应提醒列表的按钮触发。
 - 上新、调货、回库必须在同一个事务中校验当前 `status`，并同时更新新状态和对应时间字段。
 - 所有 `*RemindCount` 为空时按 0 处理。
@@ -227,9 +230,22 @@ pnpm run build:pages
 
 - `src/workflows/export_workflow.ts`
 - `src/libs/date.ts`
+- `src/libs/settings.ts`
 
 任务：
 
+- `export_workflow` 先执行销售报表导出，再执行商品报表和库存报表导出。
+- 销售报表导出开始日期按以下规则计算：
+  - `settings` 表中存在 `sales-export-checkpoint`：上次成功导出日期的次日。
+  - 没有销售 checkpoint：`2026-03-01`。
+- 销售报表导出结束日期为昨天。
+- 销售导出日期使用 `YYYY-MM-DD` 格式。
+- 当销售导出开始日期大于结束日期时，跳过 `export_sales`，不更新 checkpoint。
+- 销售导出成功后，将结束日期写入 `settings` 表独立记录：
+  - `id = "sales-export-checkpoint"`
+  - `lastSuccessfulSalesExportDate = 结束日期`
+- 销售导出普通失败或 checkpoint 写入失败时，workflow 继续执行商品和库存导出，并在返回数据中记录失败信息。
+- 销售导出返回 `auth-required` 时，workflow 返回成功认证态并停止后续导出。
 - `export_workflow` 执行时通过 `initDB(agent)` 读取本地 `product` 表。
 - 商品报表导出开始时间按以下规则计算：
   - 本地 `product` 表已有商品：最大 `createdTime + 1 秒`。
@@ -239,6 +255,12 @@ pnpm run build:pages
 - 无论 `export_goods` 是否跳过，仍调用一次 `export_stock`。
 - `export_goods` 或 `export_stock` 返回失败时，workflow 返回失败。
 - workflow 返回数据中包含：
+  - `salesExportSkipped`
+  - `salesExportSucceeded`
+  - `salesExportStartDate`
+  - `salesExportEndDate`
+  - `lastSuccessfulSalesExportDate`
+  - `salesExportError`
   - `goodsExportSkipped`
   - `goodsExportStartTime`
   - `goodsExportEndTime`
@@ -246,6 +268,12 @@ pnpm run build:pages
 
 验收：
 
+- 本地无销售 checkpoint 时，销售导出范围为 `2026-03-01` 到昨天。
+- 本地有销售 checkpoint 时，销售导出范围从 checkpoint 次日到昨天。
+- 销售开始日期大于昨天时，销售导出被跳过且 checkpoint 不更新。
+- 销售导出成功后，checkpoint 更新为昨天。
+- 销售导出普通失败时，商品和库存导出仍继续执行。
+- 销售导出返回认证态时，workflow 成功短路且不继续商品和库存导出。
 - 本地无商品时，商品导出范围为昨天 `00:00:00` 到当前时间。
 - 本地有商品时，商品导出范围从最大 `createdTime + 1 秒` 到当前时间。
 - 最大 `createdTime` 已晚于当前时间时，商品导出被跳过。

@@ -22,13 +22,31 @@ import {
 } from "../libs/auth_required";
 import { DB_TABLES, initDB } from "../libs/db";
 import {
+  addDaysToDateString,
+  compareDateStrings,
   formatDateTime,
+  getYesterdayDateString,
   getYesterdayStartTimestamp,
   toTimestamp,
 } from "../libs/date";
+import {
+  loadSalesExportCheckpoint,
+  saveSalesExportCheckpoint,
+} from "../libs/settings";
 import type { Product } from "../models/types";
 
 type ExportWorkflowDb = any;
+
+const DEFAULT_SALES_EXPORT_START_DATE = "2026-03-01";
+
+interface SalesExportData {
+  salesExportSkipped: boolean;
+  salesExportSucceeded: boolean;
+  salesExportStartDate: string;
+  salesExportEndDate: string;
+  lastSuccessfulSalesExportDate?: string;
+  salesExportError?: string;
+}
 
 interface GoodsExportRange {
   goodsExportSkipped: boolean;
@@ -37,7 +55,7 @@ interface GoodsExportRange {
   maxProductCreatedTime?: number;
 }
 
-interface ExportWorkflowData extends GoodsExportRange {}
+interface ExportWorkflowData extends SalesExportData, GoodsExportRange {}
 
 function assertApiSuccess(result: ExecutionResult, actionName: string): void {
   if (isAuthRequiredExtractData(result.task?.extract_data)) {
@@ -75,11 +93,85 @@ export function getGoodsExportRange(
   };
 }
 
+export async function getSalesExportRange(
+  db: ExportWorkflowDb,
+  referenceDate = new Date(Date.now()),
+): Promise<SalesExportData> {
+  const checkpoint = await loadSalesExportCheckpoint(db);
+  const startDate = checkpoint
+    ? addDaysToDateString(checkpoint.lastSuccessfulSalesExportDate, 1)
+    : DEFAULT_SALES_EXPORT_START_DATE;
+  const endDate = getYesterdayDateString(referenceDate);
+
+  return {
+    salesExportSkipped: compareDateStrings(startDate, endDate) > 0,
+    salesExportSucceeded: true,
+    salesExportStartDate: startDate,
+    salesExportEndDate: endDate,
+    lastSuccessfulSalesExportDate: checkpoint?.lastSuccessfulSalesExportDate,
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+async function executeSalesExport(
+  db: ExportWorkflowDb,
+  apis: Pick<WorkflowApis, "export_sales">,
+  referenceDate = new Date(Date.now()),
+): Promise<SalesExportData> {
+  const range = await getSalesExportRange(db, referenceDate);
+
+  if (range.salesExportSkipped) {
+    return range;
+  }
+
+  let salesResult: ExecutionResult;
+  try {
+    salesResult = await apis.export_sales(range.salesExportStartDate, range.salesExportEndDate);
+  } catch (error) {
+    return {
+      ...range,
+      salesExportSucceeded: false,
+      salesExportError: `export_sales failed: ${getErrorMessage(error)}`,
+    };
+  }
+
+  if (isAuthRequiredExtractData(salesResult.task?.extract_data)) {
+    throw new AuthRequiredError();
+  }
+
+  if (!salesResult.success) {
+    return {
+      ...range,
+      salesExportSucceeded: false,
+      salesExportError: `export_sales failed${salesResult.error ? `: ${salesResult.error}` : ""}`,
+    };
+  }
+
+  try {
+    const checkpoint = await saveSalesExportCheckpoint(db, range.salesExportEndDate);
+    return {
+      ...range,
+      lastSuccessfulSalesExportDate: checkpoint.lastSuccessfulSalesExportDate,
+    };
+  } catch (error) {
+    return {
+      ...range,
+      salesExportSucceeded: false,
+      salesExportError: `save sales export checkpoint failed: ${getErrorMessage(error)}`,
+    };
+  }
+}
+
 export async function executeExportWorkflow(
   db: ExportWorkflowDb,
-  apis: Pick<WorkflowApis, "export_goods" | "export_stock">,
+  apis: Pick<WorkflowApis, "export_goods" | "export_stock" | "export_sales">,
   referenceDate = new Date(Date.now()),
 ): Promise<ExportWorkflowData> {
+  const salesData = await executeSalesExport(db, apis, referenceDate);
   const maxProductCreatedTime = await getMaxProductCreatedTime(db);
   const range = getGoodsExportRange(maxProductCreatedTime, referenceDate);
 
@@ -94,12 +186,15 @@ export async function executeExportWorkflow(
   const stockResult = await apis.export_stock();
   assertApiSuccess(stockResult, "export_stock");
 
-  return range;
+  return {
+    ...salesData,
+    ...range,
+  };
 }
 
 export async function executeExportWorkflowWithHandling(
   db: ExportWorkflowDb,
-  apis: Pick<WorkflowApis, "export_goods" | "export_stock">,
+  apis: Pick<WorkflowApis, "export_goods" | "export_stock" | "export_sales">,
   referenceDate = new Date(Date.now()),
 ) {
   try {

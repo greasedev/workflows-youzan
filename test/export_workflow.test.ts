@@ -4,9 +4,15 @@ import assert from "node:assert/strict";
 import { DB_TABLES } from "../src/libs/db";
 import { AUTH_REQUIRED_MESSAGE } from "../src/libs/auth_required";
 import {
+  SALES_EXPORT_CHECKPOINT_ID,
+  loadSalesExportCheckpoint,
+  saveSalesExportCheckpoint,
+} from "../src/libs/settings";
+import {
   executeExportWorkflow,
   executeExportWorkflowWithHandling,
   getGoodsExportRange,
+  getSalesExportRange,
 } from "../src/workflows/export_workflow";
 import type { ExecutionResult } from "../src/api";
 import { cleanupTestDb, createTestDb } from "./helpers/db";
@@ -45,17 +51,27 @@ function resultWithExtractData(extractData: string): ExecutionResult {
 }
 
 function createApis(params: {
+  salesResult?: ExecutionResult;
   goodsResult?: ExecutionResult;
   stockResult?: ExecutionResult;
 }) {
+  const salesCalls: Array<[string | undefined, string | undefined]> = [];
   const goodsCalls: Array<[string, string]> = [];
   let stockCalls = 0;
   return {
+    salesCalls,
     goodsCalls,
     get stockCalls() {
       return stockCalls;
     },
     apis: {
+      async export_sales(
+        startTime?: string,
+        endTime?: string,
+      ): Promise<ExecutionResult> {
+        salesCalls.push([startTime, endTime]);
+        return params.salesResult ?? successResult();
+      },
       async export_goods(startTime: string, endTime: string): Promise<ExecutionResult> {
         goodsCalls.push([startTime, endTime]);
         return params.goodsResult ?? successResult();
@@ -91,6 +107,53 @@ test("商品导出范围在有商品时从最大 createdTime 加 1 秒开始", (
   });
 });
 
+test("销售导出范围在无 checkpoint 时从 2026-03-01 到昨天", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+
+  assert.deepEqual(await getSalesExportRange(db, referenceDate), {
+    salesExportSkipped: false,
+    salesExportSucceeded: true,
+    salesExportStartDate: "2026-03-01",
+    salesExportEndDate: "2026-05-05",
+    lastSuccessfulSalesExportDate: undefined,
+  });
+});
+
+test("销售导出范围在有 checkpoint 时从次日到昨天", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  await saveSalesExportCheckpoint(db, "2026-05-03");
+
+  assert.deepEqual(await getSalesExportRange(db, referenceDate), {
+    salesExportSkipped: false,
+    salesExportSucceeded: true,
+    salesExportStartDate: "2026-05-04",
+    salesExportEndDate: "2026-05-05",
+    lastSuccessfulSalesExportDate: "2026-05-03",
+  });
+});
+
+test("销售导出开始日期晚于昨天时跳过且不更新 checkpoint", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  await saveSalesExportCheckpoint(db, "2026-05-05");
+  const apiHarness = createApis({});
+
+  const data = await executeExportWorkflow(db, apiHarness.apis, referenceDate);
+
+  assert.equal(data.salesExportSkipped, true);
+  assert.equal(data.salesExportSucceeded, true);
+  assert.deepEqual(apiHarness.salesCalls, []);
+  assert.deepEqual(await loadSalesExportCheckpoint(db), {
+    id: SALES_EXPORT_CHECKPOINT_ID,
+    lastSuccessfulSalesExportDate: "2026-05-05",
+  });
+});
+
 test("商品水位达到当前时间时跳过商品导出但仍导出库存", async (t) => {
   const db = await createTestDb();
   t.after(() => cleanupTestDb(db));
@@ -103,6 +166,7 @@ test("商品水位达到当前时间时跳过商品导出但仍导出库存", as
 
   const data = await executeExportWorkflow(db, apiHarness.apis, referenceDate);
 
+  assert.deepEqual(apiHarness.salesCalls, [["2026-03-01", "2026-05-05"]]);
   assert.equal(data.goodsExportSkipped, true);
   assert.deepEqual(apiHarness.goodsCalls, []);
   assert.equal(apiHarness.stockCalls, 1);
@@ -126,9 +190,53 @@ test("export_workflow 使用 product 表最大 createdTime 调用商品导出和
 
   const data = await executeExportWorkflow(db, apiHarness.apis, referenceDate);
 
+  assert.deepEqual(apiHarness.salesCalls, [["2026-03-01", "2026-05-05"]]);
+  assert.deepEqual(await loadSalesExportCheckpoint(db), {
+    id: SALES_EXPORT_CHECKPOINT_ID,
+    lastSuccessfulSalesExportDate: "2026-05-05",
+  });
   assert.equal(data.goodsExportSkipped, false);
   assert.deepEqual(apiHarness.goodsCalls, [["2026-05-03 08:30:01", "2026-05-06 12:00:00"]]);
   assert.equal(apiHarness.stockCalls, 1);
+});
+
+test("销售导出失败时仍继续商品导出和库存导出", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  const apiHarness = createApis({ salesResult: failureResult("sales failed") });
+
+  const result = await executeExportWorkflowWithHandling(db, apiHarness.apis, referenceDate);
+
+  assert.equal(result.success, true);
+  assert.equal(result.message, "Workflow completed successfully");
+  assert.equal(result.data?.salesExportSucceeded, false);
+  assert.equal(result.data?.salesExportError, "export_sales failed: sales failed");
+  assert.deepEqual(apiHarness.salesCalls, [["2026-03-01", "2026-05-05"]]);
+  assert.equal(apiHarness.goodsCalls.length, 1);
+  assert.equal(apiHarness.stockCalls, 1);
+  assert.equal(await loadSalesExportCheckpoint(db), undefined);
+});
+
+test("销售导出 auth-required 时 workflow 成功短路且不继续后续导出", async (t) => {
+  const db = await createTestDb();
+  t.after(() => cleanupTestDb(db));
+  const referenceDate = new Date(2026, 4, 6, 12, 0, 0);
+  const apiHarness = createApis({
+    salesResult: resultWithExtractData(JSON.stringify([AUTH_REQUIRED_MESSAGE])),
+  });
+
+  const result = await executeExportWorkflowWithHandling(db, apiHarness.apis, referenceDate);
+
+  assert.deepEqual(result, {
+    success: true,
+    message: AUTH_REQUIRED_MESSAGE,
+    data: null,
+  });
+  assert.equal(apiHarness.salesCalls.length, 1);
+  assert.equal(apiHarness.goodsCalls.length, 0);
+  assert.equal(apiHarness.stockCalls, 0);
+  assert.equal(await loadSalesExportCheckpoint(db), undefined);
 });
 
 test("export_goods 返回 auth-required 时 workflow 成功短路且不继续导出库存", async (t) => {
