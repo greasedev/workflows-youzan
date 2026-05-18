@@ -172,6 +172,7 @@ export async function executeExportWorkflow(
   referenceDate = new Date(Date.now()),
 ): Promise<ExportWorkflowData> {
   const salesData = await executeSalesExport(db, apis, referenceDate);
+  
   const maxProductCreatedTime = await getMaxProductCreatedTime(db);
   const range = getGoodsExportRange(maxProductCreatedTime, referenceDate);
 
