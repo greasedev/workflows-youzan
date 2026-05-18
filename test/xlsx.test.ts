@@ -2,7 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mock } from "node:test";
 import * as XLSX from "xlsx";
-import { fetchAndParseProductXlsx, fetchAndParseStockXlsx } from "../src/libs/xlsx";
+import {
+  fetchAndParseProductXlsx,
+  fetchAndParseSalesXlsx,
+  fetchAndParseStockXlsx,
+} from "../src/libs/xlsx";
 import { getYesterdayEndTimestamp } from "../src/libs/date";
 import { NOW } from "./helpers/fixtures";
 
@@ -10,6 +14,17 @@ function createWorkbookBuffer(rows: Record<string, unknown>[]): ArrayBuffer {
   const workbook = XLSX.utils.book_new();
   const worksheet = XLSX.utils.json_to_sheet(rows);
   XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+  return XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+}
+
+function createWorkbookBufferWithSheets(
+  sheets: Array<{ name: string; rows: Record<string, unknown>[] }>,
+): ArrayBuffer {
+  const workbook = XLSX.utils.book_new();
+  sheets.forEach((sheet) => {
+    const worksheet = XLSX.utils.json_to_sheet(sheet.rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+  });
   return XLSX.write(workbook, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
 }
 
@@ -148,4 +163,79 @@ test("库存 Excel 解析商品条码(SPU)列并过滤非正库存", async (t) =
     ],
   );
   assert.ok(stocks.every((stock) => stock.lastUpdatedTime > 0));
+});
+
+test("销售 Excel 解析商品条码和商品销售数量并过滤无效行", async (t) => {
+  mockFetchWithWorkbooks(
+    t,
+    new Map([
+      [
+        "https://example.test/sales.xlsx",
+        createWorkbookBuffer([
+          {
+            商品条码: " SKU-A ",
+            商品销售数量: 3,
+          },
+          {
+            商品条码: "SKU-B",
+            商品销售数量: "2",
+          },
+          {
+            商品条码: "SKU-ZERO",
+            商品销售数量: 0,
+          },
+          {
+            商品条码: "SKU-NEGATIVE",
+            商品销售数量: -1,
+          },
+          {
+            商品条码: "SKU-BAD",
+            商品销售数量: "bad",
+          },
+          {
+            商品条码: "",
+            商品销售数量: 5,
+          },
+        ]),
+      ],
+    ]),
+  );
+
+  const sales = await fetchAndParseSalesXlsx("https://example.test/sales.xlsx");
+
+  assert.deepEqual(
+    sales.map((sale) => [sale.barcode, sale.quantity]),
+    [
+      ["SKU-A", 3],
+      ["SKU-B", 2],
+    ],
+  );
+});
+
+test("销售 Excel 支持按指定 sheet 解析", async (t) => {
+  mockFetchWithWorkbooks(
+    t,
+    new Map([
+      [
+        "https://example.test/sales-with-sheets.xlsx",
+        createWorkbookBufferWithSheets([
+          {
+            name: "Ignored",
+            rows: [{ 商品条码: "IGNORED", 商品销售数量: 1 }],
+          },
+          {
+            name: "Sales",
+            rows: [{ 商品条码: "TARGET", 商品销售数量: 4 }],
+          },
+        ]),
+      ],
+    ]),
+  );
+
+  const sales = await fetchAndParseSalesXlsx(
+    "https://example.test/sales-with-sheets.xlsx",
+    "Sales",
+  );
+
+  assert.deepEqual(sales, [{ barcode: "TARGET", quantity: 4 }]);
 });

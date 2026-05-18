@@ -1,12 +1,14 @@
 import * as XLSX from "xlsx";
-import type { Product, Stock } from "../models/types";
+import type { Product, Stock, Sales } from "../models/types";
 import { getCurrentTimestamp } from "../libs/reminders";
 import { getYesterdayEndTimestamp } from "./date";
 
-type XlsxRowMapper<T extends Product | Stock> = (
+type ParsedXlsxRow = Product | Stock | Sales;
+
+type XlsxRowMapper<T extends ParsedXlsxRow> = (
   row: Record<string, unknown>,
 ) => T;
-type XlsxRowFilter<T extends Product | Stock> = (row: T) => boolean;
+type XlsxRowFilter<T extends ParsedXlsxRow> = (row: T) => boolean;
 
 // Excel 列名到 Product 字段的映射
 const PRODUCT_COLUMN_MAPPING: Record<string, keyof Product> = {
@@ -21,6 +23,12 @@ const STOCK_COLUMN_MAPPING: Record<string, keyof Stock> = {
   "商品条码(SPU)": "barcode",
   "门店/仓库": "store",
   实物库存: "stock",
+};
+
+// Excel 列名到 Sales 字段的映射
+const SALES_COLUMN_MAPPING: Record<string, keyof Sales> = {
+  商品条码: "barcode",
+  商品销售数量: "quantity",
 };
 
 const EXCEL_EPOCH_OFFSET_DAYS = 25569;
@@ -116,13 +124,41 @@ function mapRowToStock(row: Record<string, unknown>): Stock {
 }
 
 /**
+ * 将原始行数据映射为销售结构
+ */
+function mapRowToSales(row: Record<string, unknown>): Sales {
+  const sales: Sales = {
+    barcode: "",
+    quantity: 0,
+  };
+
+  for (const [excelColumn, salesField] of Object.entries(
+    SALES_COLUMN_MAPPING,
+  )) {
+    const value = row[excelColumn];
+    if (value === undefined || value === null) continue;
+
+    switch (salesField) {
+      case "quantity":
+        sales[salesField] = Number(value) || 0;
+        break;
+      case "barcode":
+        sales[salesField] = String(value).trim();
+        break;
+    }
+  }
+
+  return sales;
+}
+
+/**
  * 从 URL 获取 xlsx 文件，并解析为映射后的行数据
  * @param url xlsx 文件 URL
  * @param mapRow 行映射函数，例如 mapRowToProduct 或 mapRowToStock
  * @param sheetName 可选工作表名称，默认读取第一个工作表
  * @returns 映射后的行数据数组
  */
-async function fetchAndParseXlsx<T extends Product | Stock>(
+async function fetchAndParseXlsx<T extends ParsedXlsxRow>(
   url: string,
   mapRow: XlsxRowMapper<T>,
   filterRow: XlsxRowFilter<T>,
@@ -169,6 +205,18 @@ export async function fetchAndParseStockXlsx(
     url,
     mapRowToStock,
     (stock) => Boolean(stock.barcode) && stock.stock > 0,
+    sheetName,
+  );
+}
+
+export async function fetchAndParseSalesXlsx(
+  url: string,
+  sheetName?: string,
+): Promise<Sales[]> {
+  return fetchAndParseXlsx(
+    url,
+    mapRowToSales,
+    (sales) => Boolean(sales.barcode) && sales.quantity > 0,
     sheetName,
   );
 }

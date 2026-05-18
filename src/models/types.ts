@@ -29,6 +29,12 @@ export interface Stock {
   lastUpdatedTime: number; // 最后更新时间，秒时间戳
 }
 
+// 销售数据接口
+export interface Sales {
+  barcode: string; // 商品规格条码
+  quantity: number; // 商品销售数量
+}
+
 // 时间计算结果接口
 export interface DurationResult {
   days: number;
