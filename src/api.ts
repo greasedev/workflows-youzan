@@ -34,6 +34,8 @@ export interface WorkflowApis {
   get_goods_report: () => Promise<ExecutionResult>;
   export_stock: () => Promise<ExecutionResult>;
   get_stock_report: () => Promise<ExecutionResult>;
+  export_sales: (start_time?: string, end_time?: string) => Promise<ExecutionResult>;
+  get_sales_report: () => Promise<ExecutionResult>;
 }
 
 
@@ -44,7 +46,7 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
   return {
   /**
    * Export goods
-   * 打开商品库页面，在创建时间输入框中填入开始日期和结束日期，商品来源选择全部，然后点击导出按钮
+   * 导出商品数据
    * @endpoint /v1/custom/https-store-youzan-com-export-goods-gf9oj9
    */
   async export_goods(start_time: string, end_time: string): Promise<ExecutionResult> {
@@ -57,7 +59,7 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
 
   /**
    * Get goods report
-   * 获取导出文件列表，获取导出文件列表，获取导出文件列表
+   * 获取导出商品数据
    * @endpoint /v1/custom/https-store-youzan-com-get-goods-report-38unjm
    */
   async get_goods_report(): Promise<ExecutionResult> {
@@ -69,7 +71,7 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
 
   /**
    * Export stock
-   * 获取商品库存分布，获取商品库存分布，获取商品库存分布
+   * 导出库存数据
    * @endpoint /v1/custom/https-store-youzan-com-export-stock-k7is4d
    */
   async export_stock(): Promise<ExecutionResult> {
@@ -81,11 +83,36 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
 
   /**
    * Get stock report
-   * 导出库存数据，导出库存数据，导出库存数据
+   * 获取导出库存数据
    * @endpoint /v1/custom/store-youzan-com-get-stock-report-lc82o7
    */
   async get_stock_report(): Promise<ExecutionResult> {
     const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-get-stock-report-lc82o7', {
+      method: 'POST',
+    });
+    return data;
+  },
+
+  /**
+   * Export sales
+   * 导出销售数据
+   * @endpoint /v1/custom/store-youzan-com-export-sales-i69zt7
+   */
+  async export_sales(start_time?: string, end_time?: string): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-export-sales-i69zt7', {
+      method: 'POST',
+      body: { start_time, end_time },
+    });
+    return data;
+  },
+
+  /**
+   * Get sales report
+   * 获取导出销售数据
+   * @endpoint /v1/custom/store-youzan-com-get-sales-report-wzznwo
+   */
+  async get_sales_report(): Promise<ExecutionResult> {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-get-sales-report-wzznwo', {
       method: 'POST',
     });
     return data;
