@@ -34,7 +34,7 @@ export interface WorkflowApis {
   get_goods_report: () => Promise<ExecutionResult>;
   export_stock: () => Promise<ExecutionResult>;
   get_stock_report: () => Promise<ExecutionResult>;
-  export_sales: (start_time?: string, end_time?: string) => Promise<ExecutionResult>;
+  export_sales: (start_time: string, end_time: string) => Promise<ExecutionResult>;
   get_sales_report: () => Promise<ExecutionResult>;
 }
 
@@ -47,10 +47,10 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
   /**
    * Export goods
    * 导出商品数据
-   * @endpoint /v1/custom/https-store-youzan-com-export-goods-gf9oj9
+   * @endpoint /v1/custom/store-youzan-com-export-goods-gf9oj9
    */
   async export_goods(start_time: string, end_time: string): Promise<ExecutionResult> {
-    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-export-goods-gf9oj9', {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-export-goods-gf9oj9', {
       method: 'POST',
       body: { start_time, end_time },
     });
@@ -60,10 +60,10 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
   /**
    * Get goods report
    * 获取导出商品数据
-   * @endpoint /v1/custom/https-store-youzan-com-get-goods-report-38unjm
+   * @endpoint /v1/custom/store-youzan-com-get-goods-report-38unjm
    */
   async get_goods_report(): Promise<ExecutionResult> {
-    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-get-goods-report-38unjm', {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-get-goods-report-38unjm', {
       method: 'POST',
     });
     return data;
@@ -72,10 +72,10 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
   /**
    * Export stock
    * 导出库存数据
-   * @endpoint /v1/custom/https-store-youzan-com-export-stock-k7is4d
+   * @endpoint /v1/custom/store-youzan-com-export-stock-k7is4d
    */
   async export_stock(): Promise<ExecutionResult> {
-    const { data } = await agent.call<ExecutionResult>('/v1/custom/https-store-youzan-com-export-stock-k7is4d', {
+    const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-export-stock-k7is4d', {
       method: 'POST',
     });
     return data;
@@ -98,7 +98,7 @@ export function createWorkflowApis(agent: Agent): WorkflowApis {
    * 导出销售数据
    * @endpoint /v1/custom/store-youzan-com-export-sales-i69zt7
    */
-  async export_sales(start_time?: string, end_time?: string): Promise<ExecutionResult> {
+  async export_sales(start_time: string, end_time: string): Promise<ExecutionResult> {
     const { data } = await agent.call<ExecutionResult>('/v1/custom/store-youzan-com-export-sales-i69zt7', {
       method: 'POST',
       body: { start_time, end_time },
