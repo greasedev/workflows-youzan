@@ -385,7 +385,7 @@ export async function executeImportWorkflow(
   } catch (error) {
     if (error instanceof AuthRequiredError) {
       return {
-        success: true,
+        success: false,
         message: AUTH_REQUIRED_MESSAGE,
         data: null,
       };
