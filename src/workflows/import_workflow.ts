@@ -387,7 +387,7 @@ export async function executeImportWorkflow(
       return {
         success: false,
         message: AUTH_REQUIRED_MESSAGE,
-        data: null,
+        error: error,
       };
     }
 
